@@ -1,0 +1,192 @@
+"use client"
+
+import { useState, useRef, useEffect } from "react"
+import { useChat } from "@ai-sdk/react"
+import { DefaultChatTransport } from "ai"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { studentLogger } from "@/lib/student-logger"
+
+type Problem = {
+  id: string
+  title: string
+  description: string
+}
+
+type StudentInfo = {
+  studentId: string
+  studentName: string
+  studentEmail: string
+}
+
+export function AIChatbot({
+  problemContext,
+  studentInfo,
+}: {
+  problemContext: Problem
+  studentInfo?: StudentInfo
+}) {
+  const [input, setInput] = useState("")
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const { messages, sendMessage, status } = useChat({
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: { problemContext },
+    }),
+  })
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  const handleSendMessage = async () => {
+    if (!input.trim() || status === "in_progress") return
+
+    if (studentInfo) {
+      studentLogger.log({
+        ...studentInfo,
+        problemId: problemContext.id,
+        problemTitle: problemContext.title,
+        action: "chat",
+        data: { message: input, role: "user" },
+      })
+    }
+
+    sendMessage({ text: input })
+    setInput("")
+  }
+
+  useEffect(() => {
+    if (messages.length > 0 && studentInfo) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage.role === "assistant") {
+        const text = lastMessage.parts.find((p) => p.type === "text")?.text
+        if (text) {
+          studentLogger.log({
+            ...studentInfo,
+            problemId: problemContext.id,
+            problemTitle: problemContext.title,
+            action: "chat",
+            data: { message: text, role: "assistant" },
+          })
+        }
+      }
+    }
+  }, [messages])
+
+  useEffect(() => {
+    if (messages.length === 0) {
+      sendMessage({
+        text: `Hi! I'm starting work on the "${problemContext.title}" problem. Can you help me understand what I need to do?`,
+      })
+    }
+  }, [])
+
+  return (
+    <div className="flex flex-col h-full bg-(--color-background)">
+      {/* Chat Header */}
+      <div className="p-4 border-b border-(--color-border) bg-(--color-card)">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-(--color-primary-blue) to-(--color-primary-yellow) flex items-center justify-center">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-bold">AI Learning Assistant</h3>
+            <p className="text-xs text-(--color-muted-foreground)">Here to guide your learning</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
+          <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+            <Card
+              className={`max-w-[80%] p-4 ${
+                message.role === "user" ? "bg-(--color-primary-blue) text-white" : "bg-(--color-card)"
+              }`}
+            >
+              {message.parts.map((part, index) => {
+                if (part.type === "text") {
+                  return (
+                    <p key={index} className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {part.text}
+                    </p>
+                  )
+                }
+                return null
+              })}
+              <span
+                className={`text-xs mt-2 block ${
+                  message.role === "user" ? "text-blue-100" : "text-(--color-muted-foreground)"
+                }`}
+              >
+                {new Date(message.createdAt || Date.now()).toLocaleTimeString()}
+              </span>
+            </Card>
+          </div>
+        ))}
+        {status === "in_progress" && (
+          <div className="flex justify-start">
+            <Card className="max-w-[80%] p-4 bg-(--color-card)">
+              <div className="flex gap-2">
+                <div
+                  className="w-2 h-2 rounded-full bg-(--color-primary-blue) animate-bounce"
+                  style={{ animationDelay: "0ms" }}
+                />
+                <div
+                  className="w-2 h-2 rounded-full bg-(--color-primary-yellow) animate-bounce"
+                  style={{ animationDelay: "150ms" }}
+                />
+                <div
+                  className="w-2 h-2 rounded-full bg-(--color-primary-red) animate-bounce"
+                  style={{ animationDelay: "300ms" }}
+                />
+              </div>
+            </Card>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div className="p-4 border-t border-(--color-border) bg-(--color-card)">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleSendMessage()
+          }}
+          className="flex gap-2"
+        >
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask a question about the problem..."
+            className="flex-1 px-4 py-2 rounded-lg border border-(--color-border) focus:outline-none focus:ring-2 focus:ring-(--color-primary-blue)"
+            disabled={status === "in_progress"}
+          />
+          <Button
+            type="submit"
+            disabled={!input.trim() || status === "in_progress"}
+            className="bg-(--color-primary-blue) hover:bg-(--color-primary-blue)/90"
+          >
+            Send
+          </Button>
+        </form>
+      </div>
+    </div>
+  )
+}
