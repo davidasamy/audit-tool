@@ -8,18 +8,18 @@ export default function HomePage() {
       <div className="max-w-4xl w-full space-y-8 text-center">
         <div className="space-y-4">
           <h1 className="text-6xl font-bold text-balance">
-            Learn to Code with <span className="text-(--color-primary-blue)">AI</span>
+            Learn to Code with <span className="text-blue-600">AI</span>
           </h1>
-          <p className="text-xl text-(--color-muted-foreground) text-pretty max-w-2xl mx-auto">
+          <p className="text-xl text-gray-600 text-pretty max-w-2xl mx-auto">
             A transparent learning platform where students solve problems with AI assistance, and instructors can
             monitor progress and understand how AI is being used.
           </p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 pt-8">
-          <Card className="p-8 hover:shadow-lg transition-shadow border-2 hover:border-(--color-primary-blue)">
+          <Card className="p-8 hover:shadow-lg transition-shadow border-2 hover:border-blue-600">
             <div className="space-y-4">
-              <div className="w-16 h-16 rounded-full bg-(--color-primary-blue) flex items-center justify-center mx-auto">
+              <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center mx-auto">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -30,20 +30,20 @@ export default function HomePage() {
                 </svg>
               </div>
               <h2 className="text-2xl font-bold">Student View</h2>
-              <p className="text-(--color-muted-foreground)">
+              <p className="text-gray-600">
                 Solve coding problems with an AI assistant that helps you learn without giving away answers
               </p>
               <Link href="/student">
-                <Button className="w-full bg-(--color-primary-blue) hover:bg-(--color-primary-blue)/90">
+                <Button className="w-full bg-blue-600 hover:bg-blue-700">
                   Start Learning
                 </Button>
               </Link>
             </div>
           </Card>
 
-          <Card className="p-8 hover:shadow-lg transition-shadow border-2 hover:border-(--color-primary-red)">
+          <Card className="p-8 hover:shadow-lg transition-shadow border-2 hover:border-red-500">
             <div className="space-y-4">
-              <div className="w-16 h-16 rounded-full bg-(--color-primary-red) flex items-center justify-center mx-auto">
+              <div className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center mx-auto">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
@@ -54,11 +54,11 @@ export default function HomePage() {
                 </svg>
               </div>
               <h2 className="text-2xl font-bold">Instructor View</h2>
-              <p className="text-(--color-muted-foreground)">
+              <p className="text-gray-600">
                 Monitor student progress, review AI interactions, and understand learning patterns
               </p>
               <Link href="/instructor">
-                <Button className="w-full bg-(--color-primary-red) hover:bg-(--color-primary-red)/90">
+                <Button className="w-full bg-red-500 hover:bg-red-600">
                   View Dashboard
                 </Button>
               </Link>

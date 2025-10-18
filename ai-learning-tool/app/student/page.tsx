@@ -1,4 +1,9 @@
+'use client'
+
 import { StudentWorkspace } from "@/components/student-workspace"
+import { useAuth } from '@/lib/auth-context'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 
 // Mock problem data
 const mockProblem = {
@@ -41,5 +46,16 @@ print(solution([2,7,11,15], 9))`,
 }
 
 export default function StudentPage() {
+  const { user, userRole, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && (!user || userRole !== 'student')) {
+      router.push('/auth/login')
+    }
+  }, [user, userRole, loading, router])
+
+  if (loading) return <div>Loading...</div>
+
   return <StudentWorkspace problem={mockProblem} />
 }
