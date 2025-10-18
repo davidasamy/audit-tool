@@ -28,10 +28,11 @@ You can return the answer in any order.`,
     "-10^9 <= target <= 10^9",
     "Only one valid answer exists.",
   ],
-  starterCode: `function twoSum(nums, target) {
-  // Write your solution here
-  
-}`,
+  starterCode: `def solution(nums, target):
+    # write your solution here
+    pass
+
+print(solution([2,7,11,15], 9))`,
   testCases: [
     { input: { nums: [2, 7, 11, 15], target: 9 }, expected: [0, 1] },
     { input: { nums: [3, 2, 4], target: 6 }, expected: [1, 2] },

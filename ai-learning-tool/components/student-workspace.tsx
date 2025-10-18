@@ -41,14 +41,28 @@ export function StudentWorkspace({ problem }: { problem: Problem }) {
     studentEmail: "demo@example.com",
   }
 
-  // Initialize Pyodide on component mount
+  // Initialize Pyodide once for the entire workspace
   useEffect(() => {
     const initPyodide = async () => {
       try {
+        // Use newer version for better compatibility
         const pyodide = await (window as any).loadPyodide({
-          indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/",
+          indexURL: "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/",
         })
         pyodideRef.current = pyodide
+        
+        // Set up output capture for print statements
+        await pyodide.runPythonAsync(`
+import sys
+import io
+_output_buffer = io.StringIO()
+_original_stdout = sys.stdout
+sys.stdout = _output_buffer
+`)
+        
+        // Load micropip for future package support
+        await pyodide.loadPackage("micropip")
+        
         setPyodideReady(true)
       } catch (error) {
         console.error("Failed to load Pyodide:", error)
@@ -66,7 +80,7 @@ export function StudentWorkspace({ problem }: { problem: Problem }) {
 
     if (!(window as any).loadPyodide) {
       const script = document.createElement("script")
-      script.src = "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"
+      script.src = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"
       script.async = true
       script.onload = initPyodide
       script.onerror = () => {
@@ -209,7 +223,12 @@ export function StudentWorkspace({ problem }: { problem: Problem }) {
 
           <TabsContent value="code" className="flex-1 flex flex-col m-0 p-0">
             <div className="flex-1 flex flex-col">
-              <CodeEditor code={code} onChange={setCode} />
+              {/* Pass pyodide instance to CodeEditor */}
+              <CodeEditor 
+                code={code} 
+                onChange={setCode} 
+                pyodide={pyodideRef.current}
+              />
 
               <div className="border-t border-(--color-border) p-4 bg-(--color-card)">
                 <Button
