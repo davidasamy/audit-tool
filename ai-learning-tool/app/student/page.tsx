@@ -2,7 +2,7 @@
 
 import { StudentWorkspace } from "@/components/student-workspace"
 import { useAuth } from '@/lib/auth-context'
-import { useRouter } from 'next/navigation'
+import { AccessDeniedToast } from '@/components/access-denied-toast'
 import { useEffect } from 'react'
 
 // Mock problem data
@@ -47,15 +47,26 @@ print(solution([2,7,11,15], 9))`,
 
 export default function StudentPage() {
   const { user, userRole, loading } = useAuth()
-  const router = useRouter()
 
   useEffect(() => {
-    if (!loading && (!user || userRole !== 'student')) {
-      router.push('/auth/login')
-    }
-  }, [user, userRole, loading, router])
+    // No redirect needed - just let component handle it
+  }, [user, userRole, loading])
 
-  if (loading) return <div>Loading...</div>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-white via-blue-50 to-yellow-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
-  return <StudentWorkspace problem={mockProblem} />
+  return (
+    <>
+      {(!user || userRole !== 'student') && <AccessDeniedToast role="student" />}
+      <StudentWorkspace problem={mockProblem} />
+    </>
+  )
 }

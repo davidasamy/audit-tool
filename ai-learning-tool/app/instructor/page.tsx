@@ -1,7 +1,10 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { InstructorDashboard } from "@/components/instructor-dashboard"
+import { AccessDeniedToast } from "@/components/access-denied-toast"
+import { useAuth } from "@/lib/auth-context"
 import { studentLogger, type LogEntry } from "@/lib/student-logger"
 
 // Mock student data
@@ -12,7 +15,7 @@ const mockStudentData = [
     email: "alice@example.com",
     problemId: "1",
     problemTitle: "Two Sum",
-    status: "completed",
+    status: "completed" as const,
     attempts: 3,
     testsPassed: 3,
     testsTotal: 3,
@@ -20,23 +23,23 @@ const mockStudentData = [
     lastActivity: new Date(Date.now() - 2 * 60 * 60 * 1000),
     chatMessages: [
       {
-        role: "user",
+        role: "user" as const,
         content: "Can you help me understand what approach I should use for this problem?",
         timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
       },
       {
-        role: "assistant",
+        role: "assistant" as const,
         content:
           "Great question! Let's think about what we need to do. We're looking for two numbers that add up to a target. What data structure might help us quickly check if we've seen a number before?",
         timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000),
       },
       {
-        role: "user",
+        role: "user" as const,
         content: "Maybe a hash map?",
         timestamp: new Date(Date.now() - 2.5 * 60 * 60 * 1000),
       },
       {
-        role: "assistant",
+        role: "assistant" as const,
         content: "Excellent thinking! A hash map is perfect for this. Can you explain why it would be useful here?",
         timestamp: new Date(Date.now() - 2.5 * 60 * 60 * 1000),
       },
@@ -59,7 +62,7 @@ const mockStudentData = [
     email: "bob@example.com",
     problemId: "1",
     problemTitle: "Two Sum",
-    status: "in-progress",
+    status: "in-progress" as const,
     attempts: 5,
     testsPassed: 1,
     testsTotal: 3,
@@ -67,23 +70,23 @@ const mockStudentData = [
     lastActivity: new Date(Date.now() - 30 * 60 * 1000),
     chatMessages: [
       {
-        role: "user",
+        role: "user" as const,
         content: "I'm stuck. Can you just show me the solution?",
         timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
       },
       {
-        role: "assistant",
+        role: "assistant" as const,
         content:
           "I understand it's frustrating, but I'm here to help you learn! Let's break this down together. What have you tried so far?",
         timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000),
       },
       {
-        role: "user",
+        role: "user" as const,
         content: "I tried using two loops but it's not working",
         timestamp: new Date(Date.now() - 45 * 60 * 60 * 1000),
       },
       {
-        role: "assistant",
+        role: "assistant" as const,
         content:
           "Two loops is a good start! That's the brute force approach. Can you show me your code so we can debug it together?",
         timestamp: new Date(Date.now() - 45 * 60 * 60 * 1000),
@@ -105,7 +108,7 @@ const mockStudentData = [
     email: "carol@example.com",
     problemId: "1",
     problemTitle: "Two Sum",
-    status: "completed",
+    status: "completed" as const,
     attempts: 2,
     testsPassed: 3,
     testsTotal: 3,
@@ -113,12 +116,12 @@ const mockStudentData = [
     lastActivity: new Date(Date.now() - 5 * 60 * 60 * 1000),
     chatMessages: [
       {
-        role: "user",
+        role: "user" as const,
         content: "What's the time complexity of using a hash map?",
         timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
       },
       {
-        role: "assistant",
+        role: "assistant" as const,
         content:
           "Great question! Hash map lookups are typically O(1) on average. If you're iterating through the array once and doing a hash map lookup for each element, what would the overall time complexity be?",
         timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
@@ -138,7 +141,13 @@ const mockStudentData = [
 ]
 
 export default function InstructorPage() {
+  const { user, userRole, loading } = useAuth()
+  const router = useRouter()
   const [students, setStudents] = useState(mockStudentData)
+
+  useEffect(() => {
+    // No redirect needed - just let component handle it
+  }, [])
 
   useEffect(() => {
     const logs = studentLogger.getLogs()
@@ -191,6 +200,21 @@ export default function InstructorPage() {
       setStudents([...liveStudents, ...mockStudentData])
     }
   }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-white via-blue-50 to-yellow-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user || userRole !== "instructor") {
+    return <AccessDeniedToast role="instructor" />
+  }
 
   return <InstructorDashboard students={students} />
 }
