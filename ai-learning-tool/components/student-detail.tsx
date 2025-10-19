@@ -41,7 +41,7 @@ export function StudentDetail({ student }: { student: Student }) {
         .eq("student_id", student.id)
         .eq("problem_title", student.problemTitle)
         .eq("action", "chat")
-        .order("created_at", { ascending: true }) // ensure oldest first
+        .order("created_at", { ascending: true }) // oldest first from Supabase
 
       if (error) {
         console.error("Failed to load chat messages:", error)
@@ -53,8 +53,9 @@ export function StudentDetail({ student }: { student: Student }) {
             content: log.data.message,
             timestamp: log.created_at,
           }))
-          // sort again just in case
+          // sort just in case and reverse so newest first
           .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+          .reverse() // now newest is first
 
         setChatMessages(messages)
       }

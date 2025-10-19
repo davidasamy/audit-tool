@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { StudentList } from "@/components/student-list"
 import { StudentDetail } from "@/components/student-detail"
 
@@ -28,14 +27,39 @@ type Student = {
   code: string
 }
 
-export function InstructorDashboard({ students }: { students: Student[] }) {
+type ClassInfo = {
+  id: string
+  name: string
+}
+
+type AssignmentInfo = {
+  id: string
+  title: string
+}
+
+export function InstructorDashboard({
+  students,
+  classes,
+  assignments,
+}: {
+  students: Student[]
+  classes: ClassInfo[]
+  assignments: AssignmentInfo[]
+}) {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
-  const [selectedClass, setSelectedClass] = useState<string>("All Classes")
-  const [selectedAssignment, setSelectedAssignment] = useState<string>("All Assignments")
+  const [selectedClass, setSelectedClass] = useState<ClassInfo | null>(
+    classes.length > 0 ? classes[0] : null
+  )
+  const [selectedAssignment, setSelectedAssignment] = useState<AssignmentInfo | null>(
+    assignments.length > 0 ? assignments[0] : null
+  )
 
   const completedCount = students.filter((s) => s.status === "completed").length
   const inProgressCount = students.filter((s) => s.status === "in-progress").length
-  const avgTimeSpent = Math.round(students.reduce((acc, s) => acc + s.timeSpent, 0) / students.length)
+  const avgTimeSpent =
+    students.length > 0
+      ? Math.round(students.reduce((acc, s) => acc + s.timeSpent, 0) / students.length)
+      : 0
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-red-50 to-yellow-50">
@@ -43,7 +67,6 @@ export function InstructorDashboard({ students }: { students: Student[] }) {
       <div className="border-b border-(--color-border) bg-white/80 backdrop-blur-sm">
         <div className="container mx-auto px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            {/* Title */}
             <div>
               <h1 className="text-3xl font-bold text-balance">Instructor Dashboard</h1>
               <p className="text-(--color-muted-foreground)">
@@ -51,29 +74,43 @@ export function InstructorDashboard({ students }: { students: Student[] }) {
               </p>
             </div>
 
-            {/* Dropdowns */}
+            {/* Class & Assignment Dropdowns */}
             <div className="flex gap-4">
-              {/* Class Dropdown */}
-              <select
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="border border-(--color-border) rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-(--color-primary-blue)"
-              >
-                <option>All Classes</option>
-                <option>Class A</option>
-                <option>Class B</option>
-              </select>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Select Class</label>
+                <select
+                  value={selectedClass?.id || ""}
+                  onChange={(e) => {
+                    const found = classes.find((c) => c.id === e.target.value)
+                    setSelectedClass(found || null)
+                  }}
+                  className="mt-1 block w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              {/* Assignment Dropdown */}
-              <select
-                value={selectedAssignment}
-                onChange={(e) => setSelectedAssignment(e.target.value)}
-                className="border border-(--color-border) rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-(--color-primary-blue)"
-              >
-                <option>All Assignments</option>
-                <option>Assignment 1</option>
-                <option>Assignment 2</option>
-              </select>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Select Assignment</label>
+                <select
+                  value={selectedAssignment?.id || ""}
+                  onChange={(e) => {
+                    const found = assignments.find((a) => a.id === e.target.value)
+                    setSelectedAssignment(found || null)
+                  }}
+                  className="mt-1 block w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {assignments.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -82,7 +119,8 @@ export function InstructorDashboard({ students }: { students: Student[] }) {
       {/* Stats Overview */}
       <div className="container mx-auto px-6 py-8">
         <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <Card className="p-6 border-2 border-(--color-primary-blue)">
+          {/* Total Students */}
+<Card className="p-6 border-2 border-(--color-primary-blue)">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-(--color-muted-foreground) mb-1">Total Students</p>
@@ -106,7 +144,6 @@ export function InstructorDashboard({ students }: { students: Student[] }) {
               <div>
                 <p className="text-sm text-(--color-muted-foreground) mb-1">Completed</p>
                 <p className="text-4xl font-bold">{completedCount}</p>
-                <p className="text-xs text-(--color-muted-foreground) mt-1">{inProgressCount} in progress</p>
               </div>
               <div className="w-12 h-12 rounded-full bg-(--color-success) flex items-center justify-center">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -151,21 +188,6 @@ export function InstructorDashboard({ students }: { students: Student[] }) {
               <StudentDetail student={selectedStudent} />
             ) : (
               <Card className="p-12 text-center">
-                <div className="w-16 h-16 rounded-full bg-(--color-muted) flex items-center justify-center mx-auto mb-4">
-                  <svg
-                    className="w-8 h-8 text-(--color-muted-foreground)"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"
-                    />
-                  </svg>
-                </div>
                 <h3 className="text-xl font-bold mb-2">Select a Student</h3>
                 <p className="text-(--color-muted-foreground)">
                   Choose a student from the list to view their progress and AI interactions
