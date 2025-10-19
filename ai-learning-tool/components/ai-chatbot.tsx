@@ -45,7 +45,7 @@ export function AIChatbot({
   }, [messages])
 
   const handleSendMessage = async () => {
-    if (!input.trim() || status === "in_progress") return
+    if (!input.trim()) return
 
     if (studentInfo) {
       studentLogger.log({
@@ -57,15 +57,23 @@ export function AIChatbot({
       })
     }
 
-    sendMessage({ text: input })
+    // Send message with proper format for ai-sdk
+    sendMessage({
+      id: crypto.randomUUID(),
+      role: "user",
+      parts: [{ type: "text", text: input }],
+    })
     setInput("")
   }
 
   useEffect(() => {
     if (messages.length > 0 && studentInfo) {
-      const lastMessage = messages[messages.length - 1]
+      const lastMessage = messages[messages.length - 1];
       if (lastMessage.role === "assistant") {
-        const text = lastMessage.parts.find((p) => p.type === "text")?.text
+        const text =
+          (lastMessage as any).parts?.find((p: any) => p.type === "text")?.text ??
+          (lastMessage as any).content ??
+          "";
         if (text) {
           studentLogger.log({
             ...studentInfo,
@@ -73,19 +81,14 @@ export function AIChatbot({
             problemTitle: problemContext.title,
             action: "chat",
             data: { message: text, role: "assistant" },
-          })
+          });
         }
       }
     }
-  }, [messages])
+  }, [messages]);
+  
 
-  useEffect(() => {
-    if (messages.length === 0) {
-      sendMessage({
-        text: `Hi! I'm starting work on the "${problemContext.title}" problem. Can you help me understand what I need to do?`,
-      })
-    }
-  }, [])
+  // Removed automatic default message - let students start the conversation
 
   return (
     <div className="flex flex-col h-full bg-(--color-background)">
@@ -112,33 +115,49 @@ export function AIChatbot({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
-          <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-            <Card
-              className={`max-w-[80%] p-4 ${
-                message.role === "user" ? "bg-(--color-primary-blue) text-white" : "bg-(--color-card)"
+          <div
+          key={message.id}
+          className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+        >
+          <Card
+            className={`max-w-[80%] p-4 ${
+              message.role === "user"
+                ? "bg-(--color-primary-blue) text-white"
+                : "bg-(--color-card)"
+            }`}
+          >
+            {/* Prefer parts -> text; otherwise fall back to content string */}
+            {Array.isArray((message as any).parts) && (message as any).parts.length > 0 ? (
+              (message as any).parts.map((part: any, index: number) =>
+                part?.type === "text" && typeof part?.text === "string" ? (
+                  <p key={index} className="text-sm whitespace-pre-wrap leading-relaxed">
+                    {part.text}
+                  </p>
+                ) : null
+              )
+            ) : typeof (message as any).content === "string" ? (
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                {(message as any).content}
+              </p>
+            ) : (
+              <p className="text-sm whitespace-pre-wrap leading-relaxed italic opacity-70">
+                {/* Fallback if neither parts nor content exist */}
+                (no displayable text)
+              </p>
+            )}
+        
+            <span
+              className={`text-xs mt-2 block ${
+                message.role === "user" ? "text-blue-100" : "text-(--color-muted-foreground)"
               }`}
             >
-              {message.parts.map((part, index) => {
-                if (part.type === "text") {
-                  return (
-                    <p key={index} className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {part.text}
-                    </p>
-                  )
-                }
-                return null
-              })}
-              <span
-                className={`text-xs mt-2 block ${
-                  message.role === "user" ? "text-blue-100" : "text-(--color-muted-foreground)"
-                }`}
-              >
-                {new Date(message.createdAt || Date.now()).toLocaleTimeString()}
-              </span>
-            </Card>
-          </div>
+              {new Date(Date.now()).toLocaleTimeString()}
+            </span>
+          </Card>
+        </div>
+        
         ))}
-        {status === "in_progress" && (
+        {status === "submitted" && (
           <div className="flex justify-start">
             <Card className="max-w-[80%] p-4 bg-(--color-card)">
               <div className="flex gap-2">
@@ -176,11 +195,11 @@ export function AIChatbot({
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask a question about the problem..."
             className="flex-1 px-4 py-2 rounded-lg border border-(--color-border) focus:outline-none focus:ring-2 focus:ring-(--color-primary-blue)"
-            disabled={status === "in_progress"}
+            disabled={status === "submitted"}
           />
           <Button
             type="submit"
-            disabled={!input.trim() || status === "in_progress"}
+            disabled={!input.trim() || status === "submitted"}
             className="bg-(--color-primary-blue) hover:bg-(--color-primary-blue)/90"
           >
             Send
