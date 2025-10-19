@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
@@ -33,8 +34,15 @@ export function TopNav() {
     <nav className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link href="/" className="text-xl font-bold text-blue-600">
-            AI Learning Platform
+          <Link href="/" className="flex items-center gap-2 text-xl font-bold text-blue-600">
+            <Image 
+              src="/wings.avif" 
+              alt="Code Angel" 
+              width={32} 
+              height={32}
+              className="rounded"
+            />
+            Code Angel
           </Link>
 
           <div className="flex items-center gap-4">

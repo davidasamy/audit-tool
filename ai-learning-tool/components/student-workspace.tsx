@@ -299,21 +299,17 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
 
       {/* Right Panel - Code Editor & Tests */}
       <div className="w-3/5 flex flex-col min-h-0">
-        {/* Code Editor - Takes remaining space after button and test results */}
+        {/* Code Editor - Takes remaining space after test results */}
         <div className="flex-1 min-h-0 overflow-hidden">
-          <CodeEditor code={code} onChange={setCode} pyodide={pyodideRef.current} onOutput={setOutput} />
-        </div>
-
-        {/* Run Button */}
-        <div className="border-t border-gray-200 bg-white flex-shrink-0 px-4 py-2">
-          <Button
-            onClick={runTests}
-            disabled={isRunning || !pyodideReady}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2"
-          >
-            <PlayCircle className="w-4 h-4" />
-            {!pyodideReady ? "Loading Python..." : isRunning ? "Running Tests..." : "Run All Tests"}
-          </Button>
+          <CodeEditor 
+            code={code} 
+            onChange={setCode} 
+            pyodide={pyodideRef.current} 
+            onOutput={setOutput}
+            onRunTests={runTests}
+            isTestRunning={isRunning}
+            pyodideReady={pyodideReady}
+          />
         </div>
 
         {/* Bottom Section - Output/Tests Tabs */}
