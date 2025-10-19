@@ -23,49 +23,86 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<'student' | 'instructor' | null>(null)
 
   useEffect(() => {
-    // Get initial session
+    let mounted = true
+
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      setSession(session)
-      setUser(session?.user ?? null)
-      
-      if (session?.user) {
-        // Fetch user role from database
-        const { data } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', session.user.id)
-          .single()
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
         
-        setUserRole(data?.role ?? null)
-      }
-      
-      setLoading(false)
-    }
+        if (!mounted) return
 
-    getSession()
+        if (error) {
+          console.error('Error getting session:', error)
+          setLoading(false)
+          return
+        }
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
         
         if (session?.user) {
-          const { data } = await supabase
+          const { data, error: roleError } = await supabase
             .from('users')
             .select('role')
             .eq('id', session.user.id)
             .single()
           
-          setUserRole(data?.role ?? null)
+          if (!mounted) return
+
+          if (roleError) {
+            // If user doesn't exist in users table, this is an orphaned auth user
+            console.warn('User not found in users table:', session.user.id)
+            console.error('Error details:', roleError)
+            // Set role to null and let them sign up again or contact support
+            setUserRole(null)
+          } else {
+            setUserRole(data?.role ?? null)
+          }
+        }
+        
+        setLoading(false)
+      } catch (error) {
+        console.error('Session error:', error)
+        if (mounted) {
+          setLoading(false)
+        }
+      }
+    }
+
+    getSession()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return
+
+        setSession(session)
+        setUser(session?.user ?? null)
+        
+        if (session?.user) {
+          const { data, error: roleError } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
+            .single()
+          
+          if (mounted) {
+            if (roleError) {
+              console.warn('User not found in users table:', session.user.id)
+              setUserRole(null)
+            } else {
+              setUserRole(data?.role ?? null)
+            }
+          }
         } else {
           setUserRole(null)
         }
       }
     )
 
-    return () => subscription?.unsubscribe()
+    return () => {
+      mounted = false
+      subscription?.unsubscribe()
+    }
   }, [])
 
   const signUp = async (email: string, password: string, role: 'student' | 'instructor') => {
@@ -78,12 +115,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (data.user) {
       // Store user role in database
-      await supabase.from('users').insert({
+      const { error: insertError } = await supabase.from('users').insert({
         id: data.user.id,
         email,
         role,
-        created_at: new Date(),
       })
+
+      if (insertError) {
+        console.error('Error creating user record:', insertError)
+        throw new Error('Failed to create user profile. Please try again.')
+      }
     }
   }
 
@@ -97,8 +138,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        console.error('Supabase sign out error:', error)
+        // Continue anyway to clear local state
+      }
+      
+      // Clear local state
+      setUser(null)
+      setSession(null)
+      setUserRole(null)
+    } catch (error) {
+      console.error('Sign out exception:', error)
+      // Clear local state even if there's an error
+      setUser(null)
+      setSession(null)
+      setUserRole(null)
+    }
   }
 
   return (

@@ -2,14 +2,26 @@
 
 import { Card } from "@/components/ui/card"
 
+type ChatMessage = {
+  role: "user" | "assistant"
+  content: string
+  timestamp: Date
+}
+
 type Student = {
   id: string
   name: string
   email: string
+  problemId: string
+  problemTitle: string
   status: "completed" | "in-progress" | "not-started"
+  attempts: number
   testsPassed: number
   testsTotal: number
+  timeSpent: number
   lastActivity: Date
+  chatMessages: ChatMessage[]
+  code: string
 }
 
 const statusColors = {

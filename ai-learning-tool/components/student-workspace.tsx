@@ -7,7 +7,8 @@ import { ProblemDescription } from "@/components/problem-description"
 import { CodeEditor } from "@/components/code-editor"
 import { TestResults } from "@/components/test-results"
 import { AIChatbot } from "@/components/ai-chatbot"
-import { studentLogger } from "@/lib/student-logger"
+import { supabaseLogger } from "@/lib/supabase-logger"
+import { useAuth } from "@/lib/auth-context"
 import { MessageSquare, Code2, PlayCircle, Sparkles } from "lucide-react"
 
 type Problem = {
@@ -29,19 +30,28 @@ type TestResult = {
   error?: string
 }
 
-export function StudentWorkspace({ problem }: { problem: Problem }) {
+interface StudentWorkspaceProps {
+  problem: Problem
+  assignmentId: string
+  classId: string
+}
+
+export function StudentWorkspace({ problem, assignmentId, classId }: StudentWorkspaceProps) {
   const [code, setCode] = useState(problem.starterCode)
   const [testResults, setTestResults] = useState<TestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
   const [pyodideReady, setPyodideReady] = useState(false)
   const [activeView, setActiveView] = useState<'problem' | 'chat'>('problem')
   const pyodideRef = useRef<any>(null)
+  const { user } = useAuth()
 
-  const studentInfo = {
-    studentId: "demo-student",
-    studentName: "Demo Student",
-    studentEmail: "demo@example.com",
-  }
+  const studentInfo = user ? {
+    studentId: user.id,
+    studentName: user.email?.split('@')[0] || 'Student',
+    studentEmail: user.email || '',
+    classId: classId,
+    assignmentId: assignmentId,
+  } : undefined
 
   // Initialize Pyodide on component mount
   useEffect(() => {
@@ -105,13 +115,16 @@ export function StudentWorkspace({ problem }: { problem: Problem }) {
 
     setIsRunning(true)
 
-    studentLogger.log({
-      ...studentInfo,
-      problemId: problem.id,
-      problemTitle: problem.title,
-      action: "code_run",
-      data: { code, timestamp: new Date() },
-    })
+    // Log code run to Supabase
+    if (studentInfo) {
+      await supabaseLogger.log({
+        ...studentInfo,
+        problemId: problem.id,
+        problemTitle: problem.title,
+        action: "code_run",
+        data: { code, timestamp: new Date() },
+      })
+    }
 
     try {
       const pyodide = pyodideRef.current
@@ -174,10 +187,10 @@ export function StudentWorkspace({ problem }: { problem: Problem }) {
 
       setTestResults(results)
 
-      // Log successful submission
+      // Log successful submission to Supabase
       const allPassed = results.every((r) => r.passed)
-      if (allPassed) {
-        studentLogger.log({
+      if (allPassed && studentInfo) {
+        await supabaseLogger.log({
           ...studentInfo,
           problemId: problem.id,
           problemTitle: problem.title,
@@ -256,20 +269,19 @@ export function StudentWorkspace({ problem }: { problem: Problem }) {
         <div className="flex-1 min-h-0 overflow-hidden">
           <CodeEditor code={code} onChange={setCode} />
 
-        {/* Run Tests Button & Results */}
-        <div className="border-t border-gray-200 bg-white flex-shrink-0">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <Button
-              onClick={runTests}
-              disabled={isRunning || !pyodideReady}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2"
-            >
-              <PlayCircle className="w-5 h-5" />
-              {!pyodideReady ? "Loading Python..." : isRunning ? "Running Tests..." : "Run All Tests"}
-            </Button>
+          {/* Run Tests Button & Results */}
+          <div className="border-t border-gray-200 bg-white flex-shrink-0">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <Button
+                onClick={runTests}
+                disabled={isRunning || !pyodideReady}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <PlayCircle className="w-5 h-5" />
+                {!pyodideReady ? "Loading Python..." : isRunning ? "Running Tests..." : "Run All Tests"}
+              </Button>
+            </div>
           </div>
-        </div>
-
 
           {/* Test Results */}
           {testResults.length > 0 && (

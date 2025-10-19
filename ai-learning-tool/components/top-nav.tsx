@@ -4,14 +4,29 @@ import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
+import { useState } from "react"
 
 export function TopNav() {
   const { user, userRole, signOut } = useAuth()
   const router = useRouter()
+  const [isSigningOut, setIsSigningOut] = useState(false)
 
   const handleSignOut = async () => {
-    await signOut()
-    router.push("/")
+    if (isSigningOut) return // Prevent double-clicks
+    
+    try {
+      setIsSigningOut(true)
+      await signOut()
+      
+      // Force a hard redirect to clear all state
+      window.location.href = '/auth/login'
+    } catch (error) {
+      console.error('Sign out error:', error)
+      setIsSigningOut(false)
+      
+      // Even if there's an error, try to redirect
+      window.location.href = '/auth/login'
+    }
   }
 
   return (
@@ -29,8 +44,13 @@ export function TopNav() {
                   Signed in as <span className="font-medium">{user.email}</span>
                   {userRole && <span className="ml-1">({userRole})</span>}
                 </span>
-                <Button onClick={handleSignOut} variant="outline" size="sm">
-                  Sign Out
+                <Button 
+                  onClick={handleSignOut} 
+                  variant="outline" 
+                  size="sm"
+                  disabled={isSigningOut}
+                >
+                  {isSigningOut ? 'Signing out...' : 'Sign Out'}
                 </Button>
               </>
             ) : (

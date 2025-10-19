@@ -5,7 +5,7 @@ import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport } from "ai"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { studentLogger } from "@/lib/student-logger"
+import { supabaseLogger } from "@/lib/supabase-logger"
 
 type Problem = {
   id: string
@@ -17,6 +17,8 @@ type StudentInfo = {
   studentId: string
   studentName: string
   studentEmail: string
+  classId: string
+  assignmentId: string
 }
 
 export function AIChatbot({
@@ -45,11 +47,16 @@ export function AIChatbot({
   }, [messages])
 
   const handleSendMessage = async () => {
-    if (!input.trim()) return
+    if (!input.trim() || status === "streaming") return
 
     if (studentInfo) {
-      studentLogger.log({
-        ...studentInfo,
+      // Log to Supabase
+      await supabaseLogger.log({
+        studentId: studentInfo.studentId,
+        studentName: studentInfo.studentName,
+        studentEmail: studentInfo.studentEmail,
+        classId: studentInfo.classId,
+        assignmentId: studentInfo.assignmentId,
         problemId: problemContext.id,
         problemTitle: problemContext.title,
         action: "chat",
@@ -68,27 +75,29 @@ export function AIChatbot({
 
   useEffect(() => {
     if (messages.length > 0 && studentInfo) {
-      const lastMessage = messages[messages.length - 1];
+      const lastMessage = messages[messages.length - 1]
       if (lastMessage.role === "assistant") {
         const text =
           (lastMessage as any).parts?.find((p: any) => p.type === "text")?.text ??
           (lastMessage as any).content ??
-          "";
+          ""
         if (text) {
-          studentLogger.log({
-            ...studentInfo,
+          // Log assistant response to Supabase
+          supabaseLogger.log({
+            studentId: studentInfo.studentId,
+            studentName: studentInfo.studentName,
+            studentEmail: studentInfo.studentEmail,
+            classId: studentInfo.classId,
+            assignmentId: studentInfo.assignmentId,
             problemId: problemContext.id,
             problemTitle: problemContext.title,
             action: "chat",
             data: { message: text, role: "assistant" },
-          });
+          })
         }
       }
     }
-  }, [messages]);
-  
-
-  // Removed automatic default message - let students start the conversation
+  }, [messages])
 
   return (
     <div className="flex flex-col h-full bg-(--color-background)">
@@ -116,48 +125,45 @@ export function AIChatbot({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
           <div
-          key={message.id}
-          className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-        >
-          <Card
-            className={`max-w-[80%] p-4 ${
-              message.role === "user"
-                ? "bg-(--color-primary-blue) text-white"
-                : "bg-(--color-card)"
-            }`}
+            key={message.id}
+            className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
           >
-            {/* Prefer parts -> text; otherwise fall back to content string */}
-            {Array.isArray((message as any).parts) && (message as any).parts.length > 0 ? (
-              (message as any).parts.map((part: any, index: number) =>
-                part?.type === "text" && typeof part?.text === "string" ? (
-                  <p key={index} className="text-sm whitespace-pre-wrap leading-relaxed">
-                    {part.text}
-                  </p>
-                ) : null
-              )
-            ) : typeof (message as any).content === "string" ? (
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                {(message as any).content}
-              </p>
-            ) : (
-              <p className="text-sm whitespace-pre-wrap leading-relaxed italic opacity-70">
-                {/* Fallback if neither parts nor content exist */}
-                (no displayable text)
-              </p>
-            )}
-        
-            <span
-              className={`text-xs mt-2 block ${
-                message.role === "user" ? "text-blue-100" : "text-(--color-muted-foreground)"
+            <Card
+              className={`max-w-[80%] p-4 ${
+                message.role === "user"
+                  ? "bg-(--color-primary-blue) text-white"
+                  : "bg-(--color-card)"
               }`}
             >
-              {new Date(Date.now()).toLocaleTimeString()}
-            </span>
-          </Card>
-        </div>
-        
+              {/* Handle both parts-based and content-based messages */}
+              {Array.isArray((message as any).parts) && (message as any).parts.length > 0 ? (
+                (message as any).parts.map((part: any, index: number) =>
+                  part?.type === "text" && typeof part?.text === "string" ? (
+                    <p key={index} className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {part.text}
+                    </p>
+                  ) : null
+                )
+              ) : typeof (message as any).content === "string" ? (
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                  {(message as any).content}
+                </p>
+              ) : (
+                <p className="text-sm whitespace-pre-wrap leading-relaxed italic opacity-70">
+                  (no displayable text)
+                </p>
+              )}
+              <span
+                className={`text-xs mt-2 block ${
+                  message.role === "user" ? "text-blue-100" : "text-(--color-muted-foreground)"
+                }`}
+              >
+                {new Date().toLocaleTimeString()}
+              </span>
+            </Card>
+          </div>
         ))}
-        {status === "submitted" && (
+        {status === "streaming" && (
           <div className="flex justify-start">
             <Card className="max-w-[80%] p-4 bg-(--color-card)">
               <div className="flex gap-2">
@@ -195,11 +201,11 @@ export function AIChatbot({
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask a question about the problem..."
             className="flex-1 px-4 py-2 rounded-lg border border-(--color-border) focus:outline-none focus:ring-2 focus:ring-(--color-primary-blue)"
-            disabled={status === "submitted"}
+            disabled={status === "streaming"}
           />
           <Button
             type="submit"
-            disabled={!input.trim() || status === "submitted"}
+            disabled={!input.trim() || status === "streaming"}
             className="bg-(--color-primary-blue) hover:bg-(--color-primary-blue)/90"
           >
             Send

@@ -1,96 +1,73 @@
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { BookOpen, Users, Clock } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card } from "@/components/ui/card"
+import { useAuth } from "@/lib/auth-context"
 
-const mockClasses = [
-  {
-    id: "cs101",
-    name: "Introduction to Computer Science",
-    instructor: "Dr. Sarah Johnson",
-    term: "Fall 2024",
-    color: "bg-red-500",
-    assignmentCount: 8,
-    completedCount: 5,
-  },
-  {
-    id: "cs201",
-    name: "Data Structures and Algorithms",
-    instructor: "Prof. Michael Chen",
-    term: "Fall 2024",
-    color: "bg-blue-500",
-    assignmentCount: 12,
-    completedCount: 7,
-  },
-  {
-    id: "cs301",
-    name: "Machine Learning Fundamentals",
-    instructor: "Dr. Emily Rodriguez",
-    term: "Fall 2024",
-    color: "bg-yellow-500",
-    assignmentCount: 10,
-    completedCount: 3,
-  },
-]
+export default function HomePage() {
+  const router = useRouter()
+  const { user, userRole, loading } = useAuth()
 
-export default function StudentPage() {
+  useEffect(() => {
+    if (!loading && user && userRole) {
+      // Redirect authenticated users to their respective dashboards
+      if (userRole === "student") {
+        router.push("/student")
+      } else if (userRole === "instructor") {
+        router.push("/instructor")
+      }
+    }
+  }, [user, userRole, loading, router])
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-white via-blue-50 to-yellow-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Don't render the landing page if user is logged in (redirect in progress)
+  if (user && userRole) {
+    return null
+  }
+
   return (
-    <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-6">
-          <h1 className="text-3xl font-bold text-black">My Classes</h1>
-          <p className="mt-2 text-gray-600">Select a class to view assignments</p>
+    <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-gradient-to-br from-white via-blue-50 to-yellow-50">
+      <div className="max-w-4xl w-full space-y-8 text-center">
+        <div className="space-y-4">
+          <h1 className="text-6xl font-bold text-balance">
+            Learn to Code with <span className="text-blue-600">AI</span>
+          </h1>
+          <p className="text-xl text-gray-600 text-pretty max-w-2xl mx-auto">
+            A transparent learning platform where students solve problems with AI assistance, and instructors can
+            monitor progress and understand how AI is being used.
+          </p>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {mockClasses.map((classItem) => (
-            <Link key={classItem.id} href={`/student/class/${classItem.id}`}>
-              <Card className="group cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className={`rounded-lg ${classItem.color} p-3`}>
-                      <BookOpen className="h-6 w-6 text-white" />
-                    </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {classItem.term}
-                    </Badge>
-                  </div>
-                  <CardTitle className="mt-4 text-xl group-hover:text-blue-600 transition-colors">
-                    {classItem.name}
-                  </CardTitle>
-                  <CardDescription className="flex items-center gap-1 text-sm">
-                    <Users className="h-3 w-3" />
-                    {classItem.instructor}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <Clock className="h-4 w-4" />
-                      <span>
-                        {classItem.completedCount}/{classItem.assignmentCount} completed
-                      </span>
-                    </div>
-                    <div className="text-blue-600 font-medium">
-                      {Math.round((classItem.completedCount / classItem.assignmentCount) * 100)}%
-                    </div>
-                  </div>
-                  <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500 transition-all"
-                      style={{
-                        width: `${(classItem.completedCount / classItem.assignmentCount) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+        <div className="space-y-4 pt-8">
+          <p className="text-gray-600">Get started by signing in or creating an account</p>
+          <div className="flex gap-4 justify-center">
+            <Link href="/auth/signin">
+              <Button className="bg-blue-600 hover:bg-blue-700 px-8">
+                Sign In
+              </Button>
             </Link>
-          ))}
+            <Link href="/auth/signup">
+              <Button variant="outline" className="px-8 border-2">
+                Sign Up
+              </Button>
+            </Link>
+          </div>
         </div>
-      </main>
+      </div>
     </div>
   )
 }
