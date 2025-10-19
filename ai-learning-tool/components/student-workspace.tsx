@@ -317,7 +317,7 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
         </div>
 
         {/* Bottom Section - Output/Tests Tabs */}
-        <div className="h-48 flex flex-col border-t border-gray-200 flex-shrink-0">
+        <div className="h-64 flex flex-col border-t border-gray-200 flex-shrink-0">
           {/* Tab Headers */}
           <div className="flex border-b border-gray-200 bg-gray-50 flex-shrink-0">
             <button
