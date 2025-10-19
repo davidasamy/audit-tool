@@ -287,13 +287,12 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
 
         {/* Content Area - Scrollable */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {activeView === "problem" ? (
-            <div className="p-4">
-              <ProblemDescription problem={problem} />
-            </div>
-          ) : (
+          <div className={`${activeView === "problem" ? "block" : "hidden"} p-4`}>
+            <ProblemDescription problem={problem} />
+          </div>
+          <div className={`${activeView === "chat" ? "block" : "hidden"} h-full`}>
             <AIChatbot problemContext={problem} studentInfo={studentInfo} />
-          )}
+          </div>
         </div>
       </div>
 
