@@ -2,9 +2,9 @@
 "use client"
 
 import { use, useEffect, useState } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { ArrowLeft } from "lucide-react"
+import { AssignmentHeader } from "@/components/assignment-header"
+import { AssignmentLoading } from "@/components/assignment-loading"
+import { AssignmentError } from "@/components/assignment-error"
 import { StudentWorkspace } from "@/components/student-workspace"
 import { getAssignment, type Assignment } from "@/lib/supabase-utils"
 
@@ -42,41 +42,8 @@ export default function AssignmentPage({
     fetchAssignment()
   }, [assignmentId])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-white">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading assignment...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (error || !assignment) {
-    return (
-      <div className="min-h-screen bg-white">
-        <header className="border-b border-gray-200 bg-white">
-          <div className="mx-auto max-w-7xl px-6 py-4">
-            <Link href={`/student/class/${classId}`}>
-              <Button variant="ghost" className="-ml-2">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Class
-              </Button>
-            </Link>
-          </div>
-        </header>
-
-        <main className="mx-auto max-w-7xl px-6 py-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-black mb-4">
-              {error || "Assignment Not Found"}
-            </h1>
-          </div>
-        </main>
-      </div>
-    )
-  }
+  if (loading) return <AssignmentLoading />
+  if (error || !assignment) return <AssignmentError error={error || "Assignment Not Found"} classId={classId} />
 
   const problem = {
     id: assignment.problemId,
@@ -90,16 +57,13 @@ export default function AssignmentPage({
   }
 
   return (
-    <div className="flex flex-col h-screen">
-      <header className="border-b border-gray-200 bg-white px-6 py-4">
-        <Link href={`/student/class/${classId}`}>
-          <Button variant="ghost" className="-ml-2">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Class
-          </Button>
-        </Link>
-      </header>
-      <StudentWorkspace problem={problem} assignmentId={assignmentId} classId={classId} />
+    <div className="flex flex-col h-screen overflow-hidden">
+      <div className="flex-shrink-0">
+        <AssignmentHeader classId={classId} />
+      </div>
+      <div className="flex-1 min-h-0">
+        <StudentWorkspace problem={problem} assignmentId={assignmentId} classId={classId} />
+      </div>
     </div>
   )
 }

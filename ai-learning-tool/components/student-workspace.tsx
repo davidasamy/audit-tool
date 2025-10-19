@@ -8,7 +8,7 @@ import { TestResults } from "@/components/test-results"
 import { AIChatbot } from "@/components/ai-chatbot"
 import { supabaseLogger } from "@/lib/supabase-logger"
 import { useAuth } from "@/lib/auth-context"
-import { Code2, PlayCircle, Sparkles } from "lucide-react"
+import { Code2, PlayCircle, Sparkles, Terminal, CheckCircle } from "lucide-react"
 
 type Problem = {
   id: string
@@ -38,9 +38,11 @@ interface StudentWorkspaceProps {
 export function StudentWorkspace({ problem, assignmentId, classId }: StudentWorkspaceProps) {
   const [code, setCode] = useState(problem.starterCode)
   const [testResults, setTestResults] = useState<TestResult[]>([])
+  const [output, setOutput] = useState<string>("")
   const [isRunning, setIsRunning] = useState(false)
   const [pyodideReady, setPyodideReady] = useState(false)
   const [activeView, setActiveView] = useState<"problem" | "chat">("problem")
+  const [activeBottomTab, setActiveBottomTab] = useState<"output" | "tests">("output")
   const pyodideRef = useRef<any>(null)
   const mountedRef = useRef(true)
   const { user } = useAuth()
@@ -154,7 +156,31 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
     try {
       const pyodide = pyodideRef.current
 
+      // Capture stdout
+      let capturedOutput = ""
+      const originalStdout = pyodide.runPython(`
+        import sys
+        from io import StringIO
+        
+        # Create a StringIO object to capture stdout
+        captured_output = StringIO()
+        original_stdout = sys.stdout
+        sys.stdout = captured_output
+      `)
+
       await pyodide.runPythonAsync(code)
+
+      // Get the captured output
+      capturedOutput = pyodide.runPython(`
+        # Get the captured output and restore stdout
+        output_value = captured_output.getvalue()
+        sys.stdout = original_stdout
+        output_value
+      `)
+
+      if (mountedRef.current) {
+        setOutput(capturedOutput || "No output")
+      }
 
       const userFunction = pyodide.globals.get("solution")
 
@@ -230,14 +256,14 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
   }
 
   return (
-    <div className="flex h-screen bg-white overflow-hidden">
+    <div className="flex h-full bg-white overflow-hidden">
       {/* Left Panel - Problem/Chat */}
       <div className="w-2/5 flex flex-col border-r border-gray-200 min-h-0">
         {/* Toggle Buttons */}
         <div className="flex border-b border-gray-200 bg-white flex-shrink-0">
           <button
             onClick={() => setActiveView("problem")}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
               activeView === "problem"
                 ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50"
                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
@@ -248,7 +274,7 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
           </button>
           <button
             onClick={() => setActiveView("chat")}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 relative ${
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-all flex items-center justify-center gap-2 relative ${
               activeView === "chat"
                 ? "text-yellow-600 border-b-2 border-yellow-500 bg-yellow-50/50"
                 : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
@@ -256,17 +282,13 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
           >
             <Sparkles className="w-4 h-4" />
             AI Assistant
-            <span className="absolute -top-1 -right-1 flex h-5 w-5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-5 w-5 bg-yellow-500"></span>
-            </span>
           </button>
         </div>
 
         {/* Content Area - Scrollable */}
         <div className="flex-1 overflow-y-auto min-h-0">
           {activeView === "problem" ? (
-            <div className="p-6">
+            <div className="p-4">
               <ProblemDescription problem={problem} />
             </div>
           ) : (
@@ -277,29 +299,74 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
 
       {/* Right Panel - Code Editor & Tests */}
       <div className="w-3/5 flex flex-col min-h-0">
-        {/* Code Editor - Flexible height */}
+        {/* Code Editor - Takes remaining space after button and test results */}
         <div className="flex-1 min-h-0 overflow-hidden">
-          <CodeEditor code={code} onChange={setCode} pyodide={pyodideRef.current} />
+          <CodeEditor code={code} onChange={setCode} pyodide={pyodideRef.current} onOutput={setOutput} />
         </div>
 
         {/* Run Button */}
-        <div className="border-t border-gray-200 bg-white flex-shrink-0 px-6 py-4 border-b">
+        <div className="border-t border-gray-200 bg-white flex-shrink-0 px-4 py-2">
           <Button
             onClick={runTests}
             disabled={isRunning || !pyodideReady}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2"
           >
-            <PlayCircle className="w-5 h-5" />
+            <PlayCircle className="w-4 h-4" />
             {!pyodideReady ? "Loading Python..." : isRunning ? "Running Tests..." : "Run All Tests"}
           </Button>
         </div>
 
-        {/* Test Results - Fixed height with scroll */}
-        {testResults.length > 0 && (
-          <div className="max-h-48 overflow-y-auto border-t border-gray-200 flex-shrink-0">
-            <TestResults results={testResults} />
+        {/* Bottom Section - Output/Tests Tabs */}
+        <div className="h-48 flex flex-col border-t border-gray-200 flex-shrink-0">
+          {/* Tab Headers */}
+          <div className="flex border-b border-gray-200 bg-gray-50 flex-shrink-0">
+            <button
+              onClick={() => setActiveBottomTab("output")}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                activeBottomTab === "output"
+                  ? "text-green-600 border-b-2 border-green-600 bg-white"
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              }`}
+            >
+              <Terminal className="w-4 h-4" />
+              Output
+            </button>
+            <button
+              onClick={() => setActiveBottomTab("tests")}
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                activeBottomTab === "tests"
+                  ? "text-blue-600 border-b-2 border-blue-600 bg-white"
+                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+              }`}
+            >
+              <CheckCircle className="w-4 h-4" />
+              Tests {testResults.length > 0 && `(${testResults.filter(r => r.passed).length}/${testResults.length})`}
+            </button>
           </div>
-        )}
+
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto bg-white">
+            {activeBottomTab === "output" ? (
+              <div className="p-4 font-mono text-sm">
+                {output ? (
+                  <pre className="whitespace-pre-wrap text-gray-800">{output}</pre>
+                ) : (
+                  <div className="text-gray-500 italic">
+                    Run your code to see output here...
+                  </div>
+                )}
+              </div>
+            ) : (
+              testResults.length > 0 ? (
+                <TestResults results={testResults} />
+              ) : (
+                <div className="p-4 text-gray-500 italic">
+                  Run your code to see test results here...
+                </div>
+              )
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -4,6 +4,7 @@ type CodeEditorProps = {
   code: string
   onChange: (code: string) => void
   pyodide?: any
+  onOutput?: (output: string) => void
 }
 
 declare global {
@@ -12,10 +13,9 @@ declare global {
   }
 }
 
-export function CodeEditor({ code, onChange, pyodide }: CodeEditorProps) {
+export function CodeEditor({ code, onChange, pyodide, onOutput }: CodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const editorInstanceRef = useRef<any>(null)
-  const outputRef = useRef<HTMLDivElement>(null)
   const [isRunning, setIsRunning] = useState(false)
 
   // Load Ace editor script
@@ -73,8 +73,9 @@ export function CodeEditor({ code, onChange, pyodide }: CodeEditorProps) {
     setIsRunning(true)
 
     try {
-      if (outputRef.current) {
-        outputRef.current.textContent = ""
+      // Clear output through callback
+      if (onOutput) {
+        onOutput("")
       }
 
       const editorCode = editorInstanceRef.current.getValue()
@@ -99,25 +100,28 @@ sys.stdout = _original_stdout
 _captured_output.getvalue()
         `)
         
-        if (outputRef.current) {
-          let displayText = output || ""
-          
-          // Also append return value if there is one and it's not None
-          if (result !== undefined && result !== null) {
-            const resultStr = String(result)
-            if (resultStr !== "None" && resultStr !== "") {
-              if (displayText) displayText += "\n"
-              displayText += resultStr
-            }
+        let displayText = output || ""
+        
+        // Also append return value if there is one and it's not None
+        if (result !== undefined && result !== null) {
+          const resultStr = String(result)
+          if (resultStr !== "None" && resultStr !== "") {
+            if (displayText) displayText += "\n"
+            displayText += resultStr
           }
-          
-          outputRef.current.textContent = displayText
+        }
+        
+        // Send output to parent component
+        if (onOutput) {
+          onOutput(displayText)
         }
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error)
-      if (outputRef.current) {
-        outputRef.current.textContent = errorMsg
+      
+      // Send error to parent component
+      if (onOutput) {
+        onOutput(errorMsg)
       }
       
       // Ensure stdout is restored even on error
@@ -143,7 +147,7 @@ _captured_output.getvalue()
   }, [pyodide])
 
   return (
-    <div className="flex flex-col h-2/3 bg-white text-gray-900">
+    <div className="flex flex-col h-full bg-white text-gray-900">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-300">
         <span className="text-sm text-gray-700 font-medium">solution.py</span>
@@ -161,25 +165,14 @@ _captured_output.getvalue()
         </div>
       </div>
 
-      {/* Editor and Output Container */}
-      <div className="flex flex-col flex-1 min-h-0">
+      {/* Editor Container - Full height */}
+      <div className="flex-1 min-h-0">
         {/* Ace Editor */}
         <div
           ref={editorRef}
-          className="flex-1 min-h-0 ace_editor"
+          className="h-full ace_editor"
           style={{ height: "100%" }}
         />
-
-        {/* Output Panel */}
-        <div className="h-1/4 border-t border-gray-300 flex flex-col min-h-0">
-          <div className="px-3 py-2 text-xs text-gray-600 bg-gray-100 border-b border-gray-300 font-semibold">
-            Output
-          </div>
-          <div
-            ref={outputRef}
-            className="flex-1 overflow-auto bg-white text-gray-900 font-mono text-sm p-3 whitespace-pre-wrap break-words border border-gray-200"
-          />
-        </div>
       </div>
     </div>
   )
