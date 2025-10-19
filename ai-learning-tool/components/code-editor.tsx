@@ -118,7 +118,7 @@ export function CodeEditor({ code, onChange, pyodide }: CodeEditorProps) {
   }, [pyodide])
 
   return (
-    <div className="flex flex-col h-full bg-white text-gray-900">
+    <div className="flex flex-col h-2/3 bg-white text-gray-900">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-300">
         <span className="text-sm text-gray-700 font-medium">solution.py</span>

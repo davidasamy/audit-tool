@@ -1,13 +1,14 @@
+// components/student-workspace.tsx
 "use client"
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ProblemDescription } from "@/components/problem-description"
 import { CodeEditor } from "@/components/code-editor"
 import { TestResults } from "@/components/test-results"
 import { AIChatbot } from "@/components/ai-chatbot"
 import { studentLogger } from "@/lib/student-logger"
+import { MessageSquare, Code2, PlayCircle, Sparkles } from "lucide-react"
 
 type Problem = {
   id: string
@@ -33,6 +34,7 @@ export function StudentWorkspace({ problem }: { problem: Problem }) {
   const [testResults, setTestResults] = useState<TestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
   const [pyodideReady, setPyodideReady] = useState(false)
+  const [activeView, setActiveView] = useState<'problem' | 'chat'>('problem')
   const pyodideRef = useRef<any>(null)
 
   const studentInfo = {
@@ -41,28 +43,14 @@ export function StudentWorkspace({ problem }: { problem: Problem }) {
     studentEmail: "demo@example.com",
   }
 
-  // Initialize Pyodide once for the entire workspace
+  // Initialize Pyodide on component mount
   useEffect(() => {
     const initPyodide = async () => {
       try {
-        // Use newer version for better compatibility
         const pyodide = await (window as any).loadPyodide({
-          indexURL: "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/",
+          indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/",
         })
         pyodideRef.current = pyodide
-        
-        // Set up output capture for print statements
-        await pyodide.runPythonAsync(`
-import sys
-import io
-_output_buffer = io.StringIO()
-_original_stdout = sys.stdout
-sys.stdout = _output_buffer
-`)
-        
-        // Load micropip for future package support
-        await pyodide.loadPackage("micropip")
-        
         setPyodideReady(true)
       } catch (error) {
         console.error("Failed to load Pyodide:", error)
@@ -80,7 +68,7 @@ sys.stdout = _output_buffer
 
     if (!(window as any).loadPyodide) {
       const script = document.createElement("script")
-      script.src = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"
+      script.src = "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"
       script.async = true
       script.onload = initPyodide
       script.onerror = () => {
@@ -92,6 +80,14 @@ sys.stdout = _output_buffer
       initPyodide()
     }
   }, [])
+
+  // Helper function to build Python function call based on input structure
+  const buildFunctionCall = (input: any): string => {
+    const args = Object.entries(input).map(([key, value]) => {
+      return JSON.stringify(value)
+    })
+    return `solution(${args.join(", ")})`
+  }
 
   const runTests = async () => {
     if (!pyodideReady || !pyodideRef.current) {
@@ -135,23 +131,29 @@ sys.stdout = _output_buffer
       // Run each test case
       for (const testCase of problem.testCases) {
         try {
+          // Build the function call dynamically based on input structure
+          const functionCall = buildFunctionCall(testCase.input)
+          
           // Call the Python function with test inputs
-          const actual = await pyodide.runPythonAsync(
-            `solution(${JSON.stringify(testCase.input.nums)}, ${testCase.input.target})`
-          )
+          const actual = await pyodide.runPythonAsync(functionCall)
 
           // Convert Python result to JavaScript
-          const actualValue = actual.toJs ? actual.toJs() : actual
+          let actualValue = actual
+          if (actual && typeof actual.toJs === 'function') {
+            actualValue = actual.toJs()
+          }
 
-          // Sort if arrays for comparison
-          const actualSorted = Array.isArray(actualValue)
-            ? [...actualValue].sort((a, b) => a - b)
-            : actualValue
-          const expectedSorted = Array.isArray(testCase.expected)
-            ? [...testCase.expected].sort((a, b) => a - b)
-            : testCase.expected
-
-          const passed = JSON.stringify(actualSorted) === JSON.stringify(expectedSorted)
+          // Compare results based on type
+          let passed = false
+          if (Array.isArray(testCase.expected) && Array.isArray(actualValue)) {
+            // For arrays, sort before comparison (for problems like two-sum)
+            const actualSorted = [...actualValue].sort((a, b) => a - b)
+            const expectedSorted = [...testCase.expected].sort((a, b) => a - b)
+            passed = JSON.stringify(actualSorted) === JSON.stringify(expectedSorted)
+          } else {
+            // For other types, direct comparison
+            passed = JSON.stringify(actualValue) === JSON.stringify(testCase.expected)
+          }
 
           results.push({
             passed,
@@ -199,59 +201,83 @@ sys.stdout = _output_buffer
   }
 
   return (
-    <div className="flex h-screen bg-(--color-background)">
-      {/* Left Panel - Problem Description */}
-      <div className="w-1/2 border-r border-(--color-border) overflow-y-auto">
-        <div className="p-6">
-          <ProblemDescription problem={problem} />
+    <div className="flex h-[calc(100vh-73px)] bg-white">
+      {/* Left Panel - Switchable Content */}
+      <div className="w-2/5 border-r border-gray-200 flex flex-col">
+        {/* Toggle Buttons */}
+        <div className="flex border-b border-gray-200 bg-white">
+          <button
+            onClick={() => setActiveView('problem')}
+            className={`flex-1 px-6 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+              activeView === 'problem'
+                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            <Code2 className="w-4 h-4" />
+            Problem
+          </button>
+          <button
+            onClick={() => setActiveView('chat')}
+            className={`flex-1 px-6 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 relative ${
+              activeView === 'chat'
+                ? 'text-yellow-600 border-b-2 border-yellow-500 bg-yellow-50/50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            AI Assistant
+            <span className="absolute -top-1 -right-1 flex h-5 w-5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-5 w-5 bg-yellow-500"></span>
+            </span>
+          </button>
+        </div>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-hidden">
+          {activeView === 'problem' ? (
+            <div className="h-full overflow-y-auto">
+              <div className="p-6">
+                <ProblemDescription problem={problem} />
+              </div>
+            </div>
+          ) : (
+            <div className="h-full">
+              <AIChatbot problemContext={problem} studentInfo={studentInfo} />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Right Panel - Code Editor & Chat */}
-      <div className="w-1/2 flex flex-col">
-        <Tabs defaultValue="code" className="flex-1 flex flex-col">
-          <div className="border-b border-(--color-border) px-6 pt-4">
-            <TabsList className="w-full justify-start">
-              <TabsTrigger value="code" className="flex-1">
-                Code Editor
-              </TabsTrigger>
-              <TabsTrigger value="chat" className="flex-1">
-                AI Assistant
-              </TabsTrigger>
-            </TabsList>
+      {/* Right Panel - Code Editor & Tests */}
+      <div className="w-3/5 flex flex-col min-h-0">
+        {/* Code Editor */}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <CodeEditor code={code} onChange={setCode} />
+
+        {/* Run Tests Button & Results */}
+        <div className="border-t border-gray-200 bg-white flex-shrink-0">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <Button
+              onClick={runTests}
+              disabled={isRunning || !pyodideReady}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2"
+            >
+              <PlayCircle className="w-5 h-5" />
+              {!pyodideReady ? "Loading Python..." : isRunning ? "Running Tests..." : "Run All Tests"}
+            </Button>
           </div>
+        </div>
 
-          <TabsContent value="code" className="flex-1 flex flex-col m-0 p-0">
-            <div className="flex-1 flex flex-col">
-              {/* Pass pyodide instance to CodeEditor */}
-              <CodeEditor 
-                code={code} 
-                onChange={setCode} 
-                pyodide={pyodideRef.current}
-              />
 
-              <div className="border-t border-(--color-border) p-4 bg-(--color-card)">
-                <Button
-                  onClick={runTests}
-                  disabled={isRunning || !pyodideReady}
-                  className="bg-(--color-primary-blue) hover:bg-(--color-primary-blue)/90"
-                >
-                  {!pyodideReady ? "Loading Python..." : isRunning ? "Running Tests..." : "Run Tests"}
-                </Button>
-              </div>
-
-              {testResults.length > 0 && (
-                <div className="border-t border-(--color-border) overflow-y-auto max-h-64">
-                  <TestResults results={testResults} />
-                </div>
-              )}
+          {/* Test Results */}
+          {testResults.length > 0 && (
+            <div className="max-h-48 overflow-y-auto">
+              <TestResults results={testResults} />
             </div>
-          </TabsContent>
-
-          <TabsContent value="chat" className="flex-1 m-0 p-0">
-            <AIChatbot problemContext={problem} studentInfo={studentInfo} />
-          </TabsContent>
-        </Tabs>
+          )}
+        </div>
       </div>
     </div>
   )

@@ -1,72 +1,96 @@
-'use client'
+import Link from "next/link"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { BookOpen, Users, Clock } from "lucide-react"
 
-import { StudentWorkspace } from "@/components/student-workspace"
-import { useAuth } from '@/lib/auth-context'
-import { AccessDeniedToast } from '@/components/access-denied-toast'
-import { useEffect } from 'react'
-
-// Mock problem data
-const mockProblem = {
-  id: "1",
-  title: "Two Sum",
-  difficulty: "Easy" as const,
-  description: `Given an array of integers \`nums\` and an integer \`target\`, return indices of the two numbers such that they add up to \`target\`.
-
-You may assume that each input would have exactly one solution, and you may not use the same element twice.
-
-You can return the answer in any order.`,
-  examples: [
-    {
-      input: "nums = [2,7,11,15], target = 9",
-      output: "[0,1]",
-      explanation: "Because nums[0] + nums[1] == 9, we return [0, 1].",
-    },
-    {
-      input: "nums = [3,2,4], target = 6",
-      output: "[1,2]",
-      explanation: "Because nums[1] + nums[2] == 6, we return [1, 2].",
-    },
-  ],
-  constraints: [
-    "2 <= nums.length <= 10^4",
-    "-10^9 <= nums[i] <= 10^9",
-    "-10^9 <= target <= 10^9",
-    "Only one valid answer exists.",
-  ],
-  starterCode: `def solution(nums, target):
-    # write your solution here
-    pass
-
-print(solution([2,7,11,15], 9))`,
-  testCases: [
-    { input: { nums: [2, 7, 11, 15], target: 9 }, expected: [0, 1] },
-    { input: { nums: [3, 2, 4], target: 6 }, expected: [1, 2] },
-    { input: { nums: [3, 3], target: 6 }, expected: [0, 1] },
-  ],
-}
+const mockClasses = [
+  {
+    id: "cs101",
+    name: "Introduction to Computer Science",
+    instructor: "Dr. Sarah Johnson",
+    term: "Fall 2024",
+    color: "bg-red-500",
+    assignmentCount: 8,
+    completedCount: 5,
+  },
+  {
+    id: "cs201",
+    name: "Data Structures and Algorithms",
+    instructor: "Prof. Michael Chen",
+    term: "Fall 2024",
+    color: "bg-blue-500",
+    assignmentCount: 12,
+    completedCount: 7,
+  },
+  {
+    id: "cs301",
+    name: "Machine Learning Fundamentals",
+    instructor: "Dr. Emily Rodriguez",
+    term: "Fall 2024",
+    color: "bg-yellow-500",
+    assignmentCount: 10,
+    completedCount: 3,
+  },
+]
 
 export default function StudentPage() {
-  const { user, userRole, loading } = useAuth()
-
-  useEffect(() => {
-    // No redirect needed - just let component handle it
-  }, [user, userRole, loading])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-white via-blue-50 to-yellow-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <>
-      {(!user || userRole !== 'student') && <AccessDeniedToast role="student" />}
-      <StudentWorkspace problem={mockProblem} />
-    </>
+    <div className="min-h-screen bg-white">
+      <header className="border-b border-gray-200 bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-6">
+          <h1 className="text-3xl font-bold text-black">My Classes</h1>
+          <p className="mt-2 text-gray-600">Select a class to view assignments</p>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-7xl px-6 py-8">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {mockClasses.map((classItem) => (
+            <Link key={classItem.id} href={`/student/class/${classItem.id}`}>
+              <Card className="group cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02]">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className={`rounded-lg ${classItem.color} p-3`}>
+                      <BookOpen className="h-6 w-6 text-white" />
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                      {classItem.term}
+                    </Badge>
+                  </div>
+                  <CardTitle className="mt-4 text-xl group-hover:text-blue-600 transition-colors">
+                    {classItem.name}
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-1 text-sm">
+                    <Users className="h-3 w-3" />
+                    {classItem.instructor}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 text-gray-600">
+                      <Clock className="h-4 w-4" />
+                      <span>
+                        {classItem.completedCount}/{classItem.assignmentCount} completed
+                      </span>
+                    </div>
+                    <div className="text-blue-600 font-medium">
+                      {Math.round((classItem.completedCount / classItem.assignmentCount) * 100)}%
+                    </div>
+                  </div>
+                  <div className="mt-3 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-500 transition-all"
+                      style={{
+                        width: `${(classItem.completedCount / classItem.assignmentCount) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </main>
+    </div>
   )
 }
