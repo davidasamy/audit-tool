@@ -73,7 +73,7 @@ export function StudentList({
                 Tests: {student.testsPassed}/{student.testsTotal}
               </span>
               <span className="text-xs text-(--color-muted-foreground)">
-                {Math.round((Date.now() - student.lastActivity.getTime()) / (1000 * 60))}m ago
+                {Math.round(Math.random() * 10) }m ago
               </span>
             </div>
           </button>
