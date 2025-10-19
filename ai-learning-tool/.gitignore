@@ -28,7 +28,6 @@ next-env.d.ts
 
 .DS
 
-*./package.json
 *./package-lock.json
 data/*
 scripts/*
