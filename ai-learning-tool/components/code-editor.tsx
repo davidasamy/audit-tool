@@ -79,27 +79,52 @@ export function CodeEditor({ code, onChange, pyodide }: CodeEditorProps) {
 
       const editorCode = editorInstanceRef.current.getValue()
       
-      // Clear the output buffer before running
-      await pyodide.runPythonAsync("_output_buffer.truncate(0); _output_buffer.seek(0)")
+      // Set up output capture
+      await pyodide.runPythonAsync(`
+import sys
+from io import StringIO
+_captured_output = StringIO()
+_original_stdout = sys.stdout
+sys.stdout = _captured_output
+      `)
       
       // Run user code
-      const result = await pyodide.runPythonAsync(editorCode)
-
-      // Get captured output
-      const output = await pyodide.runPythonAsync("_output_buffer.getvalue()")
-      
-      if (outputRef.current) {
-        outputRef.current.textContent = output || ""
+      let result
+      try {
+        result = await pyodide.runPythonAsync(editorCode)
+      } finally {
+        // Restore stdout and get captured output
+        const output = await pyodide.runPythonAsync(`
+sys.stdout = _original_stdout
+_captured_output.getvalue()
+        `)
         
-        // Also append return value if there is one
-        if (result !== undefined) {
-          outputRef.current.textContent += String(result)
+        if (outputRef.current) {
+          let displayText = output || ""
+          
+          // Also append return value if there is one and it's not None
+          if (result !== undefined && result !== null) {
+            const resultStr = String(result)
+            if (resultStr !== "None" && resultStr !== "") {
+              if (displayText) displayText += "\n"
+              displayText += resultStr
+            }
+          }
+          
+          outputRef.current.textContent = displayText
         }
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error)
       if (outputRef.current) {
         outputRef.current.textContent = errorMsg
+      }
+      
+      // Ensure stdout is restored even on error
+      try {
+        await pyodide.runPythonAsync("sys.stdout = _original_stdout")
+      } catch (e) {
+        // ignore restoration errors
       }
     } finally {
       setIsRunning(false)
