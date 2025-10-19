@@ -2,9 +2,6 @@ import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import fs from "fs/promises";
 import path from "path";
 
-// @ts-ignore - pdf-parse doesn't have proper type exports
-const pdfParse = require("pdf-parse");
-
 export interface ProcessedDocument {
   chunks: string[];
   metadata: {
@@ -22,7 +19,11 @@ async function extractTextFromPDF(buffer: Buffer): Promise<{
   numPages: number;
 }> {
   try {
-    const data = await pdfParse(buffer);
+    // Use require for CommonJS module and instantiate PDFParse class
+    // @ts-ignore - pdf-parse is a CommonJS module
+    const { PDFParse } = require("pdf-parse");
+    const parser = new PDFParse();
+    const data = await parser.parse(buffer);
     return {
       text: data.text,
       numPages: data.numpages,

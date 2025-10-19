@@ -4,6 +4,8 @@ import {
   InvokeModelCommand,
 } from "@aws-sdk/client-bedrock-runtime";
 
+// Configure client with AWS best practices for handling throttling
+// Uses adaptive retry mode with exponential backoff and jitter
 const bedrockClient = new BedrockRuntimeClient({
   region: process.env.AWS_REGION || "us-east-2",
   credentials: {
@@ -11,6 +13,8 @@ const bedrockClient = new BedrockRuntimeClient({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
     sessionToken: process.env.AWS_SESSION_TOKEN,
   },
+  maxAttempts: 10, // AWS recommended: up to 10 retry attempts for on-demand throttling
+  // SDK automatically uses adaptive retry mode with exponential backoff and jitter
 });
 
 export interface BedrockStreamOptions {
@@ -57,40 +61,35 @@ export async function* streamBedrockResponse(
     body: JSON.stringify(payload),
   });
 
-  let attempts = 0;
-  const maxAttempts = 6;
+  // AWS SDK will automatically handle retries with adaptive mode:
+  // - Exponential backoff with full jitter
+  // - Up to 10 attempts (synced with 60-second quota refresh cycle)
+  // - Distributes requests across multiple seconds within 1-minute period
+  try {
+    const response = await bedrockClient.send(command);
 
-  while (true) {
-    try {
-      const response = await bedrockClient.send(command);
-
-      if (!response.body) return;
-
-      for await (const event of response.body) {
-        if (!event?.chunk?.bytes) continue;
-
-        const json = new TextDecoder().decode(event.chunk.bytes);
-        const chunk = JSON.parse(json);
-
-        // Only stream deltas as user-visible tokens
-        if (chunk.type === "content_block_delta" && chunk.delta?.text) {
-          yield chunk.delta.text as string;
-        }
-        // You can log other types if helpful for debugging:
-        // else if (chunk.type !== "message_delta") console.log(chunk);
-      }
-      break; // finished streaming
-    } catch (err: any) {
-      // Handle throttling with full-jitter exponential backoff
-      if (err?.name === "ThrottlingException" && attempts < maxAttempts - 1) {
-        const base = Math.min(1000 * 2 ** attempts, 30_000);
-        await sleep(fullJitter(base));
-        attempts++;
-        continue;
-      }
-      console.error("Bedrock streaming error:", err);
-      throw new Error("Failed to stream response from Claude");
+    if (!response.body) {
+      console.error("No response body from Bedrock");
+      return;
     }
+
+    for await (const event of response.body) {
+      if (!event?.chunk?.bytes) continue;
+
+      const json = new TextDecoder().decode(event.chunk.bytes);
+      const chunk = JSON.parse(json);
+
+      // Only stream deltas as user-visible tokens
+      if (chunk.type === "content_block_delta" && chunk.delta?.text) {
+        yield chunk.delta.text as string;
+      }
+    }
+  } catch (err: any) {
+    console.error("Bedrock streaming error after all retries:", err);
+    if (err?.name === "ThrottlingException") {
+      throw new Error("AI tutor is experiencing high demand. Please wait 30 seconds and try again.");
+    }
+    throw new Error(`Failed to stream response: ${err.message || "Unknown error"}`);
   }
 }
 

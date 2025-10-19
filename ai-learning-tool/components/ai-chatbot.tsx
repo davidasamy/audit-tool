@@ -32,7 +32,11 @@ export function AIChatbot({
 }) {
   const [input, setInput] = useState("")
   const [sentMessageIds, setSentMessageIds] = useState<Set<string>>(new Set())
+  const [lastMessageTime, setLastMessageTime] = useState<number>(0)
+  const [cooldownRemaining, setCooldownRemaining] = useState<number>(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  
+  const COOLDOWN_SECONDS = 60 // 1 minute cooldown to prevent AWS throttling
 
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
@@ -99,9 +103,36 @@ export function AIChatbot({
     logMessages()
   }, [messages, status, sentMessageIds, studentInfo, problemContext])
 
+  // Cooldown timer effect
+  useEffect(() => {
+    if (cooldownRemaining > 0) {
+      const timer = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - lastMessageTime) / 1000)
+        const remaining = Math.max(0, COOLDOWN_SECONDS - elapsed)
+        setCooldownRemaining(remaining)
+        
+        if (remaining === 0) {
+          clearInterval(timer)
+        }
+      }, 100)
+      
+      return () => clearInterval(timer)
+    }
+  }, [cooldownRemaining, lastMessageTime, COOLDOWN_SECONDS])
+
   // Send user message
   const handleSendMessage = async () => {
     if (!input.trim() || status === "streaming") return
+    
+    // Check cooldown
+    const now = Date.now()
+    const timeSinceLastMessage = (now - lastMessageTime) / 1000
+    
+    if (lastMessageTime > 0 && timeSinceLastMessage < COOLDOWN_SECONDS) {
+      const remaining = Math.ceil(COOLDOWN_SECONDS - timeSinceLastMessage)
+      setCooldownRemaining(remaining)
+      return
+    }
 
     sendMessage({
       id: uuidv4(),
@@ -109,6 +140,8 @@ export function AIChatbot({
       parts: [{ type: "text", text: input }],
     })
     setInput("")
+    setLastMessageTime(now)
+    setCooldownRemaining(COOLDOWN_SECONDS)
   }
 
   return (
@@ -206,6 +239,11 @@ export function AIChatbot({
 
       {/* Input */}
       <div className="p-4 border-t border-(--color-border) bg-(--color-card) flex-shrink-0">
+        {cooldownRemaining > 0 && (
+          <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 text-center">
+            Please wait {cooldownRemaining} seconds before asking another question. Take time to think about the previous response.
+          </div>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault()
@@ -217,16 +255,20 @@ export function AIChatbot({
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a question about the problem..."
-            className="flex-1 px-4 py-2 rounded-lg border border-(--color-border) focus:outline-none focus:ring-2 focus:ring-(--color-primary-blue)"
-            disabled={status === "streaming"}
+            placeholder={
+              cooldownRemaining > 0
+                ? `Cooldown active (${cooldownRemaining}s remaining)...`
+                : "Ask a question about the problem..."
+            }
+            className="flex-1 px-4 py-2 rounded-lg border border-(--color-border) focus:outline-none focus:ring-2 focus:ring-(--color-primary-blue) disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={status === "streaming" || cooldownRemaining > 0}
           />
           <Button
             type="submit"
-            disabled={!input.trim() || status === "streaming"}
-            className="bg-(--color-primary-blue) hover:bg-(--color-primary-blue)/90"
+            disabled={!input.trim() || status === "streaming" || cooldownRemaining > 0}
+            className="bg-(--color-primary-blue) hover:bg-(--color-primary-blue)/90 disabled:opacity-50"
           >
-            Send
+            {cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : "Send"}
           </Button>
         </form>
       </div>
