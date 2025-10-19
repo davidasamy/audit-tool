@@ -345,11 +345,11 @@ function ClassSettingsPanel({ classInfo }: { classInfo: ClassInfo }) {
       {/* Cooldown */}
       <div className="mb-4">
         <label className="block mb-1 font-medium text-gray-700 text-sm">
-          Chat Cooldown (seconds)
+          Chat Cooldown (minutes)
         </label>
         <input
           type="number"
-          min={0}
+          min={1}
           value={cooldown}
           onChange={(e) => setCooldown(Number(e.target.value))}
           className="w-24 px-2 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
