@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processPDF, savePDF } from "@/lib/pdf-processor";
+import { processPDF, savePDF } from "@/lib/pdf-processor-client";
 import { createOrUpdateVectorStore } from "@/lib/vector-store";
 
 export async function POST(request: NextRequest) {
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { getAssignmentPDFs } = await import("@/lib/pdf-processor");
+    const { getAssignmentPDFs } = await import("@/lib/pdf-processor-client");
     const { vectorStoreExists } = await import("@/lib/vector-store");
 
     // Get list of PDFs

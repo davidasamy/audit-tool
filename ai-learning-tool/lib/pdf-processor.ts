@@ -3,20 +3,20 @@ import fs from "fs/promises";
 import path from "path";
 
 export interface ProcessedDocument {
-  chunks: string[];
+  chunks: string[]
   metadata: {
-    fileName: string;
-    totalPages?: number;
-    processedAt: string;
-  };
+    fileName: string
+    totalPages?: number
+    processedAt: string
+  }
 }
 
 /**
- * Extract text from a PDF buffer
+ * Extract text from a PDF buffer using pdf2json
  */
 async function extractTextFromPDF(buffer: Buffer): Promise<{
-  text: string;
-  numPages: number;
+  text: string
+  numPages: number
 }> {
   try {
     // Use require for CommonJS module and instantiate PDFParse class
@@ -39,22 +39,24 @@ async function extractTextFromPDF(buffer: Buffer): Promise<{
  */
 async function chunkText(text: string): Promise<string[]> {
   const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 1200, // Increased from 512 to capture more context
-    chunkOverlap: 100, // Increased overlap for better continuity
+    chunkSize: 1200,
+    chunkOverlap: 100,
     separators: ["\n\n", "\n", ". ", " ", ""],
-  });
+  })
 
-  const docs = await splitter.createDocuments([text]);
-  
-  // Filter out chunks that are too short (likely just headers or noise)
-  const minChunkLength = 100; // Minimum 100 characters
+  const docs = await splitter.createDocuments([text])
+
+  // Filter out chunks that are too short
+  const minChunkLength = 50 // Reduced from 100 to be more lenient
   const filteredChunks = docs
     .map((doc: { pageContent: string }) => doc.pageContent.trim())
-    .filter((chunk) => chunk.length >= minChunkLength);
-  
-  console.log(`Created ${docs.length} chunks, kept ${filteredChunks.length} after filtering (min length: ${minChunkLength})`);
-  
-  return filteredChunks;
+    .filter((chunk) => chunk.length >= minChunkLength)
+
+  console.log(
+    `Created ${docs.length} chunks, kept ${filteredChunks.length} after filtering (min length: ${minChunkLength})`
+  )
+
+  return filteredChunks
 }
 
 /**
@@ -64,15 +66,33 @@ export async function processPDF(
   pdfBuffer: Buffer,
   fileName: string
 ): Promise<ProcessedDocument> {
+  console.log(`Processing PDF: ${fileName}, size: ${pdfBuffer.length} bytes`)
+  
   // Extract text from PDF
-  const { text, numPages } = await extractTextFromPDF(pdfBuffer);
+  const { text, numPages } = await extractTextFromPDF(pdfBuffer)
 
   if (!text || text.trim().length === 0) {
-    throw new Error("No text content found in PDF");
+    console.error("No text extracted from PDF. This might be an image-based PDF or have extraction issues.")
+    throw new Error("No text content found in PDF. The PDF might be image-based or require OCR.")
   }
 
+  console.log(`Successfully extracted ${text.length} characters from ${numPages} pages`)
+
   // Chunk the text
-  const chunks = await chunkText(text);
+  const chunks = await chunkText(text)
+
+  if (chunks.length === 0) {
+    console.warn("No chunks created after filtering. Text might be too short or fragmented.")
+    // Return at least one chunk with all the text
+    return {
+      chunks: [text],
+      metadata: {
+        fileName,
+        totalPages: numPages,
+        processedAt: new Date().toISOString(),
+      },
+    }
+  }
 
   return {
     chunks,
@@ -81,72 +101,5 @@ export async function processPDF(
       totalPages: numPages,
       processedAt: new Date().toISOString(),
     },
-  };
-}
-
-/**
- * Save PDF to assignment directory
- */
-export async function savePDF(
-  assignmentId: string,
-  fileName: string,
-  buffer: Buffer
-): Promise<string> {
-  const pdfDir = path.join(
-    process.cwd(),
-    "data",
-    "assignments",
-    assignmentId,
-    "pdfs"
-  );
-
-  // Ensure directory exists
-  await fs.mkdir(pdfDir, { recursive: true });
-
-  const filePath = path.join(pdfDir, fileName);
-  await fs.writeFile(filePath, buffer);
-
-  return filePath;
-}
-
-/**
- * Get all PDFs for an assignment
- */
-export async function getAssignmentPDFs(
-  assignmentId: string
-): Promise<string[]> {
-  const pdfDir = path.join(
-    process.cwd(),
-    "data",
-    "assignments",
-    assignmentId,
-    "pdfs"
-  );
-
-  try {
-    const files = await fs.readdir(pdfDir);
-    return files.filter((file) => file.endsWith(".pdf"));
-  } catch (error) {
-    // Directory doesn't exist or is empty
-    return [];
   }
-}
-
-/**
- * Load a PDF file
- */
-export async function loadPDF(
-  assignmentId: string,
-  fileName: string
-): Promise<Buffer> {
-  const filePath = path.join(
-    process.cwd(),
-    "data",
-    "assignments",
-    assignmentId,
-    "pdfs",
-    fileName
-  );
-
-  return await fs.readFile(filePath);
 }
