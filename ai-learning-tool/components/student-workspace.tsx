@@ -279,7 +279,7 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
       <div className="w-3/5 flex flex-col min-h-0">
         {/* Code Editor - Flexible height */}
         <div className="flex-1 min-h-0 overflow-hidden">
-          <CodeEditor code={code} onChange={setCode} />
+          <CodeEditor code={code} onChange={setCode} pyodide={pyodideRef.current} />
         </div>
 
         {/* Run Button */}
