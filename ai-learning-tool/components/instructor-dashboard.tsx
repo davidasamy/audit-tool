@@ -30,6 +30,8 @@ type Student = {
 
 export function InstructorDashboard({ students }: { students: Student[] }) {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [selectedClass, setSelectedClass] = useState<string>("All Classes")
+  const [selectedAssignment, setSelectedAssignment] = useState<string>("All Assignments")
 
   const completedCount = students.filter((s) => s.status === "completed").length
   const inProgressCount = students.filter((s) => s.status === "in-progress").length
@@ -40,12 +42,39 @@ export function InstructorDashboard({ students }: { students: Student[] }) {
       {/* Header */}
       <div className="border-b border-(--color-border) bg-white/80 backdrop-blur-sm">
         <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            {/* Title */}
             <div>
               <h1 className="text-3xl font-bold text-balance">Instructor Dashboard</h1>
-              <p className="text-(--color-muted-foreground)">Monitor student progress and AI interactions</p>
+              <p className="text-(--color-muted-foreground)">
+                Monitor student progress and AI interactions
+              </p>
             </div>
-            <Button className="bg-(--color-primary-red) hover:bg-(--color-primary-red)/90">Export Data</Button>
+
+            {/* Dropdowns */}
+            <div className="flex gap-4">
+              {/* Class Dropdown */}
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="border border-(--color-border) rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-(--color-primary-blue)"
+              >
+                <option>All Classes</option>
+                <option>Class A</option>
+                <option>Class B</option>
+              </select>
+
+              {/* Assignment Dropdown */}
+              <select
+                value={selectedAssignment}
+                onChange={(e) => setSelectedAssignment(e.target.value)}
+                className="border border-(--color-border) rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-(--color-primary-blue)"
+              >
+                <option>All Assignments</option>
+                <option>Assignment 1</option>
+                <option>Assignment 2</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -110,7 +139,11 @@ export function InstructorDashboard({ students }: { students: Student[] }) {
         {/* Main Content */}
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
-            <StudentList students={students} selectedStudent={selectedStudent} onSelectStudent={setSelectedStudent} />
+            <StudentList
+              students={students}
+              selectedStudent={selectedStudent}
+              onSelectStudent={setSelectedStudent}
+            />
           </div>
 
           <div className="lg:col-span-2">

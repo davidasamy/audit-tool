@@ -1,7 +1,6 @@
-// components/student-workspace.tsx
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ProblemDescription } from "@/components/problem-description"
 import { CodeEditor } from "@/components/code-editor"
@@ -9,7 +8,7 @@ import { TestResults } from "@/components/test-results"
 import { AIChatbot } from "@/components/ai-chatbot"
 import { supabaseLogger } from "@/lib/supabase-logger"
 import { useAuth } from "@/lib/auth-context"
-import { MessageSquare, Code2, PlayCircle, Sparkles } from "lucide-react"
+import { Code2, PlayCircle, Sparkles } from "lucide-react"
 
 type Problem = {
   id: string
@@ -41,65 +40,88 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
   const [testResults, setTestResults] = useState<TestResult[]>([])
   const [isRunning, setIsRunning] = useState(false)
   const [pyodideReady, setPyodideReady] = useState(false)
-  const [activeView, setActiveView] = useState<'problem' | 'chat'>('problem')
+  const [activeView, setActiveView] = useState<"problem" | "chat">("problem")
   const pyodideRef = useRef<any>(null)
+  const mountedRef = useRef(true)
   const { user } = useAuth()
 
-  const studentInfo = user ? {
-    studentId: user.id,
-    studentName: user.email?.split('@')[0] || 'Student',
-    studentEmail: user.email || '',
-    classId: classId,
-    assignmentId: assignmentId,
-  } : undefined
+  const studentInfo = user
+    ? {
+        studentId: user.id,
+        studentName: user.email?.split("@")[0] || "Student",
+        studentEmail: user.email || "",
+        classId,
+        assignmentId,
+      }
+    : undefined
 
-  // Initialize Pyodide on component mount
   useEffect(() => {
+    mountedRef.current = true
+
     const initPyodide = async () => {
       try {
-        const pyodide = await (window as any).loadPyodide({
-          indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/",
-        })
-        pyodideRef.current = pyodide
-        setPyodideReady(true)
+        if (!(window as any).loadPyodide) {
+          const script = document.createElement("script")
+          script.src = "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"
+          script.async = true
+          script.onload = async () => {
+            if (!mountedRef.current) return
+            const pyodide = await (window as any).loadPyodide({
+              indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/",
+            })
+            pyodideRef.current = pyodide
+            if (mountedRef.current) setPyodideReady(true)
+          }
+          script.onerror = () => {
+            console.error("Failed to load Pyodide script")
+            if (mountedRef.current) setPyodideReady(false)
+          }
+          document.body.appendChild(script)
+        } else {
+          const pyodide = await (window as any).loadPyodide({
+            indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/",
+          })
+          pyodideRef.current = pyodide
+          if (mountedRef.current) setPyodideReady(true)
+        }
       } catch (error) {
         console.error("Failed to load Pyodide:", error)
-        setTestResults([
-          {
-            passed: false,
-            input: {},
-            expected: null,
-            actual: null,
-            error: "Failed to load Python environment",
-          },
-        ])
+        if (mountedRef.current) {
+          setTestResults([
+            {
+              passed: false,
+              input: {},
+              expected: null,
+              actual: null,
+              error: "Failed to load Python environment",
+            },
+          ])
+        }
       }
     }
 
-    if (!(window as any).loadPyodide) {
-      const script = document.createElement("script")
-      script.src = "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"
-      script.async = true
-      script.onload = initPyodide
-      script.onerror = () => {
-        console.error("Failed to load Pyodide script")
-        setPyodideReady(false)
+    initPyodide()
+
+    return () => {
+      mountedRef.current = false
+      try {
+        if (pyodideRef.current && typeof pyodideRef.current.terminate === "function") {
+          pyodideRef.current.terminate()
+        }
+      } catch (e) {
+        // ignore
       }
-      document.body.appendChild(script)
-    } else {
-      initPyodide()
+      pyodideRef.current = null
     }
   }, [])
 
-  // Helper function to build Python function call based on input structure
   const buildFunctionCall = (input: any): string => {
-    const args = Object.entries(input).map(([key, value]) => {
-      return JSON.stringify(value)
-    })
+    const args = Object.entries(input).map(([, value]) => JSON.stringify(value))
     return `solution(${args.join(", ")})`
   }
 
   const runTests = async () => {
+    if (isRunning) return
     if (!pyodideReady || !pyodideRef.current) {
       setTestResults([
         {
@@ -115,24 +137,25 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
 
     setIsRunning(true)
 
-    // Log code run to Supabase
     if (studentInfo) {
-      await supabaseLogger.log({
-        ...studentInfo,
-        problemId: problem.id,
-        problemTitle: problem.title,
-        action: "code_run",
-        data: { code, timestamp: new Date() },
-      })
+      supabaseLogger
+        .log({
+          ...studentInfo,
+          problemId: problem.id,
+          problemTitle: problem.title,
+          action: "code_run",
+          data: { code, timestamp: new Date() },
+        })
+        .catch((e) => {
+          console.warn("Logger failed (code_run):", e)
+        })
     }
 
     try {
       const pyodide = pyodideRef.current
 
-      // Execute user code to define the solution function
       await pyodide.runPythonAsync(code)
 
-      // Get the solution function from Python globals
       const userFunction = pyodide.globals.get("solution")
 
       if (!userFunction) {
@@ -141,30 +164,22 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
 
       const results: TestResult[] = []
 
-      // Run each test case
       for (const testCase of problem.testCases) {
         try {
-          // Build the function call dynamically based on input structure
           const functionCall = buildFunctionCall(testCase.input)
-          
-          // Call the Python function with test inputs
           const actual = await pyodide.runPythonAsync(functionCall)
 
-          // Convert Python result to JavaScript
           let actualValue = actual
-          if (actual && typeof actual.toJs === 'function') {
+          if (actual && typeof actual.toJs === "function") {
             actualValue = actual.toJs()
           }
 
-          // Compare results based on type
           let passed = false
           if (Array.isArray(testCase.expected) && Array.isArray(actualValue)) {
-            // For arrays, sort before comparison (for problems like two-sum)
-            const actualSorted = [...actualValue].sort((a, b) => a - b)
-            const expectedSorted = [...testCase.expected].sort((a, b) => a - b)
+            const actualSorted = [...actualValue].sort((a, b) => (a as any) - (b as any))
+            const expectedSorted = [...testCase.expected].sort((a, b) => (a as any) - (b as any))
             passed = JSON.stringify(actualSorted) === JSON.stringify(expectedSorted)
           } else {
-            // For other types, direct comparison
             passed = JSON.stringify(actualValue) === JSON.stringify(testCase.expected)
           }
 
@@ -185,12 +200,11 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
         }
       }
 
-      setTestResults(results)
+      if (mountedRef.current) setTestResults(results)
 
-      // Log successful submission to Supabase
       const allPassed = results.every((r) => r.passed)
       if (allPassed && studentInfo) {
-        await supabaseLogger.log({
+        supabaseLogger.log({
           ...studentInfo,
           problemId: problem.id,
           problemTitle: problem.title,
@@ -199,43 +213,45 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
         })
       }
     } catch (error) {
-      setTestResults([
-        {
-          passed: false,
-          input: {},
-          expected: null,
-          actual: null,
-          error: (error as Error).message,
-        },
-      ])
+      if (mountedRef.current) {
+        setTestResults([
+          {
+            passed: false,
+            input: {},
+            expected: null,
+            actual: null,
+            error: (error as Error).message,
+          },
+        ])
+      }
     } finally {
-      setIsRunning(false)
+      if (mountedRef.current) setIsRunning(false)
     }
   }
 
   return (
-    <div className="flex h-[calc(100vh-73px)] bg-white">
-      {/* Left Panel - Switchable Content */}
-      <div className="w-2/5 border-r border-gray-200 flex flex-col">
+    <div className="flex h-screen bg-white overflow-hidden">
+      {/* Left Panel - Problem/Chat */}
+      <div className="w-2/5 flex flex-col border-r border-gray-200 min-h-0">
         {/* Toggle Buttons */}
-        <div className="flex border-b border-gray-200 bg-white">
+        <div className="flex border-b border-gray-200 bg-white flex-shrink-0">
           <button
-            onClick={() => setActiveView('problem')}
+            onClick={() => setActiveView("problem")}
             className={`flex-1 px-6 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 ${
-              activeView === 'problem'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              activeView === "problem"
+                ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
             }`}
           >
             <Code2 className="w-4 h-4" />
             Problem
           </button>
           <button
-            onClick={() => setActiveView('chat')}
+            onClick={() => setActiveView("chat")}
             className={`flex-1 px-6 py-4 text-sm font-medium transition-all flex items-center justify-center gap-2 relative ${
-              activeView === 'chat'
-                ? 'text-yellow-600 border-b-2 border-yellow-500 bg-yellow-50/50'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              activeView === "chat"
+                ? "text-yellow-600 border-b-2 border-yellow-500 bg-yellow-50/50"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
             }`}
           >
             <Sparkles className="w-4 h-4" />
@@ -247,49 +263,43 @@ export function StudentWorkspace({ problem, assignmentId, classId }: StudentWork
           </button>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-hidden">
-          {activeView === 'problem' ? (
-            <div className="h-full overflow-y-auto">
-              <div className="p-6">
-                <ProblemDescription problem={problem} />
-              </div>
+        {/* Content Area - Scrollable */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {activeView === "problem" ? (
+            <div className="p-6">
+              <ProblemDescription problem={problem} />
             </div>
           ) : (
-            <div className="h-full">
-              <AIChatbot problemContext={problem} studentInfo={studentInfo} />
-            </div>
+            <AIChatbot problemContext={problem} studentInfo={studentInfo} />
           )}
         </div>
       </div>
 
       {/* Right Panel - Code Editor & Tests */}
       <div className="w-3/5 flex flex-col min-h-0">
-        {/* Code Editor */}
+        {/* Code Editor - Flexible height */}
         <div className="flex-1 min-h-0 overflow-hidden">
           <CodeEditor code={code} onChange={setCode} />
-
-          {/* Run Tests Button & Results */}
-          <div className="border-t border-gray-200 bg-white flex-shrink-0">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <Button
-                onClick={runTests}
-                disabled={isRunning || !pyodideReady}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2"
-              >
-                <PlayCircle className="w-5 h-5" />
-                {!pyodideReady ? "Loading Python..." : isRunning ? "Running Tests..." : "Run All Tests"}
-              </Button>
-            </div>
-          </div>
-
-          {/* Test Results */}
-          {testResults.length > 0 && (
-            <div className="max-h-48 overflow-y-auto">
-              <TestResults results={testResults} />
-            </div>
-          )}
         </div>
+
+        {/* Run Button */}
+        <div className="border-t border-gray-200 bg-white flex-shrink-0 px-6 py-4 border-b">
+          <Button
+            onClick={runTests}
+            disabled={isRunning || !pyodideReady}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2"
+          >
+            <PlayCircle className="w-5 h-5" />
+            {!pyodideReady ? "Loading Python..." : isRunning ? "Running Tests..." : "Run All Tests"}
+          </Button>
+        </div>
+
+        {/* Test Results - Fixed height with scroll */}
+        {testResults.length > 0 && (
+          <div className="max-h-48 overflow-y-auto border-t border-gray-200 flex-shrink-0">
+            <TestResults results={testResults} />
+          </div>
+        )}
       </div>
     </div>
   )

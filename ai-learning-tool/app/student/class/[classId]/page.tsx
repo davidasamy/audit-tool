@@ -1,4 +1,3 @@
-// app/student/class/[classId]/page.tsx
 "use client"
 
 import { use, useEffect, useState } from "react"
@@ -25,7 +24,7 @@ export default function ClassPage({ params }: { params: Promise<{ classId: strin
   const { classId } = use(params)
   const { user } = useAuth()
   const [assignments, setAssignments] = useState<AssignmentWithStatus[]>([])
-  const [className, setClassName] = useState<string>("Loading...")
+  const [className, setClassName] = useState<string>("Assignments")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,7 +41,6 @@ export default function ClassPage({ params }: { params: Promise<{ classId: strin
 
         // Fetch assignments for this class
         const classAssignments = await getAssignmentsByClass(classId)
-        setClassName(classAssignments[0]?.title ? "Class Assignments" : "Assignments")
 
         // Get activity logs to determine completion status
         const logs = await supabaseLogger.getLogs(classId, user.id)
@@ -55,18 +53,20 @@ export default function ClassPage({ params }: { params: Promise<{ classId: strin
         )
 
         // Add status to each assignment
-        const assignmentsWithStatus: AssignmentWithStatus[] = classAssignments.map((assignment) => {
-          const status = completedAssignmentIds.has(assignment.id)
-            ? "completed"
-            : logs.some((log) => log.assignmentId === assignment.id)
-              ? "in-progress"
-              : "not-started"
+        const assignmentsWithStatus: AssignmentWithStatus[] = classAssignments.map(
+          (assignment) => {
+            const status = completedAssignmentIds.has(assignment.id)
+              ? "completed"
+              : logs.some((log) => log.assignmentId === assignment.id)
+                ? "in-progress"
+                : "not-started"
 
-          return {
-            ...assignment,
-            status,
+            return {
+              ...assignment,
+              status,
+            }
           }
-        })
+        )
 
         setAssignments(assignmentsWithStatus)
       } catch (err) {
@@ -99,15 +99,25 @@ export default function ClassPage({ params }: { params: Promise<{ classId: strin
 
   if (error) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="max-w-md w-full">
-          <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded">
-            <p className="text-sm text-red-700">{error}</p>
+      <div className="min-h-screen bg-white">
+        <header className="border-b border-gray-200 bg-white">
+          <div className="mx-auto max-w-7xl px-6 py-4">
             <Link href="/student">
-              <Button className="mt-4">Back to Classes</Button>
+              <Button variant="ghost" className="-ml-2">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Classes
+              </Button>
             </Link>
           </div>
-        </div>
+        </header>
+
+        <main className="mx-auto max-w-7xl px-6 py-8">
+          <div className="max-w-md">
+            <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </main>
       </div>
     )
   }
@@ -115,20 +125,22 @@ export default function ClassPage({ params }: { params: Promise<{ classId: strin
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-6">
+        <div className="mx-auto max-w-7xl px-6 py-4">
           <Link href="/student">
-            <Button variant="ghost" className="mb-4 -ml-2">
+            <Button variant="ghost" className="-ml-2">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Classes
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold text-black">{className}</h1>
-          <p className="mt-2 text-gray-600">Select an assignment to begin working</p>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8">
-        <div className="space-y-4">
+        <h1 className="text-3xl font-bold text-black mb-2">{className}</h1>
+        <p className="text-gray-600 mb-8">Select an assignment to begin working</p>
+
+        {/* Increased spacing and fixed spacing issue */}
+        <div className="space-y-6">
           {assignments.length === 0 ? (
             <div className="bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded">
               <p className="text-sm text-yellow-700">No assignments in this class yet.</p>
@@ -138,6 +150,7 @@ export default function ClassPage({ params }: { params: Promise<{ classId: strin
               <Link
                 key={assignment.id}
                 href={`/student/class/${classId}/assignment/${assignment.id}`}
+                className="block"
               >
                 <Card className="group cursor-pointer transition-all hover:shadow-lg hover:border-blue-300">
                   <CardHeader>

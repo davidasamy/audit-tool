@@ -29,6 +29,7 @@ export function AIChatbot({
   studentInfo?: StudentInfo
 }) {
   const [input, setInput] = useState("")
+  const [sentMessageIds, setSentMessageIds] = useState<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { messages, sendMessage, status } = useChat({
@@ -38,6 +39,7 @@ export function AIChatbot({
     }),
   })
 
+  // Scroll to bottom
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
@@ -46,25 +48,59 @@ export function AIChatbot({
     scrollToBottom()
   }, [messages])
 
+  // Log messages when streaming finishes
+  useEffect(() => {
+    const logMessages = async () => {
+      if (!studentInfo) return
+      if (status === "streaming") return // wait until streaming finishes
+
+      for (const message of messages) {
+        if (!sentMessageIds.has(message.id)) {
+          // Extract content
+          let content = ""
+          if (Array.isArray((message as any).parts)) {
+            content = (message as any).parts
+              .filter((p: any) => p.type === "text")
+              .map((p: any) => p.text)
+              .join("")
+          } else if (typeof (message as any).content === "string") {
+            content = (message as any).content
+          }
+
+          if (content) {
+            try {
+              await supabaseLogger.log({
+                studentId: studentInfo.studentId,
+                studentName: studentInfo.studentName,
+                studentEmail: studentInfo.studentEmail,
+                classId: studentInfo.classId,
+                assignmentId: studentInfo.assignmentId,
+                problemId: problemContext.id,
+                problemTitle: problemContext.title,
+                action: "chat",
+                data: {
+                  message: content,
+                  role: message.role,
+                  messageId: message.id,
+                },
+              })
+            } catch (err) {
+              console.error("Failed to log chat message:", err)
+            }
+          }
+
+          setSentMessageIds((prev) => new Set(prev).add(message.id))
+        }
+      }
+    }
+
+    logMessages()
+  }, [messages, status, sentMessageIds, studentInfo, problemContext])
+
+  // Send user message
   const handleSendMessage = async () => {
     if (!input.trim() || status === "streaming") return
 
-    if (studentInfo) {
-      // Log to Supabase
-      await supabaseLogger.log({
-        studentId: studentInfo.studentId,
-        studentName: studentInfo.studentName,
-        studentEmail: studentInfo.studentEmail,
-        classId: studentInfo.classId,
-        assignmentId: studentInfo.assignmentId,
-        problemId: problemContext.id,
-        problemTitle: problemContext.title,
-        action: "chat",
-        data: { message: input, role: "user" },
-      })
-    }
-
-    // Send message with proper format for ai-sdk
     sendMessage({
       id: crypto.randomUUID(),
       role: "user",
@@ -73,39 +109,18 @@ export function AIChatbot({
     setInput("")
   }
 
-  useEffect(() => {
-    if (messages.length > 0 && studentInfo) {
-      const lastMessage = messages[messages.length - 1]
-      if (lastMessage.role === "assistant") {
-        const text =
-          (lastMessage as any).parts?.find((p: any) => p.type === "text")?.text ??
-          (lastMessage as any).content ??
-          ""
-        if (text) {
-          // Log assistant response to Supabase
-          supabaseLogger.log({
-            studentId: studentInfo.studentId,
-            studentName: studentInfo.studentName,
-            studentEmail: studentInfo.studentEmail,
-            classId: studentInfo.classId,
-            assignmentId: studentInfo.assignmentId,
-            problemId: problemContext.id,
-            problemTitle: problemContext.title,
-            action: "chat",
-            data: { message: text, role: "assistant" },
-          })
-        }
-      }
-    }
-  }, [messages])
-
   return (
     <div className="flex flex-col h-full bg-(--color-background)">
       {/* Chat Header */}
-      <div className="p-4 border-b border-(--color-border) bg-(--color-card)">
+      <div className="p-4 border-b border-(--color-border) bg-(--color-card) flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-(--color-primary-blue) to-(--color-primary-yellow) flex items-center justify-center">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-6 h-6 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -116,13 +131,15 @@ export function AIChatbot({
           </div>
           <div>
             <h3 className="font-bold">AI Learning Assistant</h3>
-            <p className="text-xs text-(--color-muted-foreground)">Here to guide your learning</p>
+            <p className="text-xs text-(--color-muted-foreground)">
+              Here to guide your learning
+            </p>
           </div>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -135,30 +152,29 @@ export function AIChatbot({
                   : "bg-(--color-card)"
               }`}
             >
-              {/* Handle both parts-based and content-based messages */}
-              {Array.isArray((message as any).parts) && (message as any).parts.length > 0 ? (
-                (message as any).parts.map((part: any, index: number) =>
-                  part?.type === "text" && typeof part?.text === "string" ? (
-                    <p key={index} className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {part.text}
+              {Array.isArray((message as any).parts) && (message as any).parts.length > 0
+                ? (message as any).parts.map((part: any, index: number) =>
+                    part?.type === "text" && typeof part?.text === "string" ? (
+                      <p key={index} className="text-sm whitespace-pre-wrap leading-relaxed">
+                        {part.text}
+                      </p>
+                    ) : null
+                  )
+                : typeof (message as any).content === "string" ? (
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      {(message as any).content}
                     </p>
-                  ) : null
-                )
-              ) : typeof (message as any).content === "string" ? (
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                  {(message as any).content}
-                </p>
-              ) : (
-                <p className="text-sm whitespace-pre-wrap leading-relaxed italic opacity-70">
-                  (no displayable text)
-                </p>
-              )}
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap leading-relaxed italic opacity-70">
+                      (no displayable text)
+                    </p>
+                  )}
               <span
                 className={`text-xs mt-2 block ${
                   message.role === "user" ? "text-blue-100" : "text-(--color-muted-foreground)"
                 }`}
               >
-                {new Date().toLocaleTimeString()}
+                {new Date((message as any).createdAt || Date.now()).toLocaleTimeString()}
               </span>
             </Card>
           </div>
@@ -187,7 +203,7 @@ export function AIChatbot({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-(--color-border) bg-(--color-card)">
+      <div className="p-4 border-t border-(--color-border) bg-(--color-card) flex-shrink-0">
         <form
           onSubmit={(e) => {
             e.preventDefault()

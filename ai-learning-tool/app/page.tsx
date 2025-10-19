@@ -4,7 +4,6 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
 import { useAuth } from "@/lib/auth-context"
 
 export default function HomePage() {
@@ -55,12 +54,12 @@ export default function HomePage() {
         <div className="space-y-4 pt-8">
           <p className="text-gray-600">Get started by signing in or creating an account</p>
           <div className="flex gap-4 justify-center">
-            <Link href="/auth/signin">
+            <Link href="/auth/signup" className="inline-block">
               <Button className="bg-blue-600 hover:bg-blue-700 px-8">
                 Sign In
               </Button>
             </Link>
-            <Link href="/auth/signup">
+            <Link href="/auth/login" className="inline-block">
               <Button variant="outline" className="px-8 border-2">
                 Sign Up
               </Button>

@@ -1,10 +1,15 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { supabase } from "@/lib/supabase"
 
 type ChatMessage = {
+  id: string
   role: "user" | "assistant"
   content: string
-  timestamp: Date
+  timestamp: string
 }
 
 type Student = {
@@ -17,12 +22,48 @@ type Student = {
   testsPassed: number
   testsTotal: number
   timeSpent: number
-  chatMessages: ChatMessage[]
   code: string
 }
 
 export function StudentDetail({ student }: { student: Student }) {
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [loading, setLoading] = useState(true)
+
   const successRate = Math.round((student.testsPassed / student.testsTotal) * 100)
+
+  useEffect(() => {
+    const loadChatMessages = async () => {
+      setLoading(true)
+
+      const { data, error } = await supabase
+        .from("activity_logs")
+        .select("id, data, created_at")
+        .eq("student_id", student.id)
+        .eq("problem_title", student.problemTitle)
+        .eq("action", "chat")
+        .order("created_at", { ascending: true }) // ensure oldest first
+
+      if (error) {
+        console.error("Failed to load chat messages:", error)
+      } else if (data) {
+        const messages: ChatMessage[] = data
+          .map((log: any) => ({
+            id: log.id,
+            role: log.data.role,
+            content: log.data.message,
+            timestamp: log.created_at,
+          }))
+          // sort again just in case
+          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+
+        setChatMessages(messages)
+      }
+
+      setLoading(false)
+    }
+
+    loadChatMessages()
+  }, [student.id, student.problemTitle])
 
   return (
     <Card className="p-6">
@@ -46,7 +87,7 @@ export function StudentDetail({ student }: { student: Student }) {
         </Card>
         <Card className="p-4 bg-(--color-card)">
           <p className="text-xs text-(--color-muted-foreground) mb-1">AI Messages</p>
-          <p className="text-2xl font-bold">{student.chatMessages.length}</p>
+          <p className="text-2xl font-bold">{chatMessages.length}</p>
         </Card>
       </div>
 
@@ -62,26 +103,32 @@ export function StudentDetail({ student }: { student: Student }) {
 
         <TabsContent value="chat" className="mt-4">
           <Card className="p-4 max-h-[500px] overflow-y-auto">
-            <div className="space-y-4">
-              {student.chatMessages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`p-4 rounded-lg ${
-                    message.role === "user" ? "bg-blue-50 border-l-4 border-(--color-primary-blue)" : "bg-gray-50"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-sm">
-                      {message.role === "user" ? student.name : "AI Assistant"}
-                    </span>
-                    <span className="text-xs text-(--color-muted-foreground)">
-                      {message.timestamp.toLocaleTimeString()}
-                    </span>
+            {loading ? (
+              <p className="text-sm text-(--color-muted-foreground)">Loading chat messages...</p>
+            ) : (
+              <div className="space-y-4">
+                {chatMessages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`p-4 rounded-lg ${
+                      message.role === "user"
+                        ? "bg-blue-50 border-l-4 border-(--color-primary-blue)"
+                        : "bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-sm">
+                        {message.role === "user" ? student.name : "AI Assistant"}
+                      </span>
+                      <span className="text-xs text-(--color-muted-foreground)">
+                        {new Date(message.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <p className="text-sm leading-relaxed">{message.content}</p>
                   </div>
-                  <p className="text-sm leading-relaxed">{message.content}</p>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </Card>
         </TabsContent>
 

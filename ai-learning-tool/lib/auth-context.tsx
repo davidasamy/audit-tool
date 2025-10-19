@@ -1,15 +1,15 @@
-'use client'
+"use client"
 
-import { createContext, useContext, useEffect, useState } from 'react'
-import type { Session, User } from '@supabase/supabase-js'
-import { supabase } from './supabase'
+import { createContext, useContext, useEffect, useRef, useState } from "react"
+import type { Session, User } from "@supabase/supabase-js"
+import { supabase } from "./supabase"
 
 interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
-  userRole: 'student' | 'instructor' | null
-  signUp: (email: string, password: string, role: 'student' | 'instructor') => Promise<void>
+  userRole: "student" | "instructor" | null
+  signUp: (email: string, password: string, role: "student" | "instructor") => Promise<void>
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
 }
@@ -20,92 +20,110 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
-  const [userRole, setUserRole] = useState<'student' | 'instructor' | null>(null)
+  const [userRole, setUserRole] = useState<"student" | "instructor" | null>(null)
+
+  // Prevent duplicate fetches when onAuthStateChange emits repeatedly
+  const lastFetchedUserIdRef = useRef<string | null>(null)
+  const mountedRef = useRef(true)
+
+  async function fetchUserRole(userId: string): Promise<"student" | "instructor" | null> {
+    try {
+      // If we already fetched this user's role, reuse it
+      if (lastFetchedUserIdRef.current === userId && userRole) {
+        return userRole
+      }
+
+      // ensure session is fresh so client can make queries
+      try {
+        // refreshSession is available on clients, but if not, this is a no-op
+        // We call getSession to ensure client state is settled
+        await supabase.auth.getSession()
+      } catch (e) {
+        // ignore - we still attempt the select below
+        console.warn("Warning while ensuring session:", e)
+      }
+
+      const { data, error } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", userId)
+        .single()
+
+      if (error) {
+        console.warn("Error fetching user role:", error.message ?? error)
+        return null
+      }
+
+      const role = data?.role ?? null
+      lastFetchedUserIdRef.current = userId
+      return role
+    } catch (err) {
+      console.warn("Failed to fetch user role:", err instanceof Error ? err.message : err)
+      return null
+    }
+  }
 
   useEffect(() => {
-    let mounted = true
+    mountedRef.current = true
 
-    const getSession = async () => {
+    const initializeAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (!mounted) return
-
+        const { data: sessionResp, error } = await supabase.auth.getSession()
         if (error) {
-          console.error('Error getting session:', error)
-          setLoading(false)
+          console.error("Error getting session:", error)
+          if (mountedRef.current) setLoading(false)
           return
         }
 
-        setSession(session)
-        setUser(session?.user ?? null)
-        
-        if (session?.user) {
-          const { data, error: roleError } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
-          
-          if (!mounted) return
+        if (!mountedRef.current) return
 
-          if (roleError) {
-            // If user doesn't exist in users table, this is an orphaned auth user
-            console.warn('User not found in users table:', session.user.id)
-            console.error('Error details:', roleError)
-            // Set role to null and let them sign up again or contact support
-            setUserRole(null)
-          } else {
-            setUserRole(data?.role ?? null)
-          }
-        }
-        
+        setSession(sessionResp.session ?? null)
+        setUser(sessionResp.session?.user ?? null)
         setLoading(false)
-      } catch (error) {
-        console.error('Session error:', error)
-        if (mounted) {
-          setLoading(false)
+
+        if (sessionResp.session?.user) {
+          const role = await fetchUserRole(sessionResp.session.user.id)
+          if (mountedRef.current) setUserRole(role)
         }
+      } catch (error) {
+        console.error("Session initialization error:", error)
+        if (mountedRef.current) setLoading(false)
       }
     }
 
-    getSession()
+    initializeAuth()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      if (!mountedRef.current) return
 
-        setSession(session)
-        setUser(session?.user ?? null)
-        
-        if (session?.user) {
-          const { data, error: roleError } = await supabase
-            .from('users')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
-          
-          if (mounted) {
-            if (roleError) {
-              console.warn('User not found in users table:', session.user.id)
-              setUserRole(null)
-            } else {
-              setUserRole(data?.role ?? null)
-            }
-          }
-        } else {
-          setUserRole(null)
+      // Update basic state immediately
+      setSession(newSession ?? null)
+      setUser(newSession?.user ?? null)
+
+      // Stop loading right away
+      setLoading(false)
+
+      // Only fetch role if user present and different from last fetched
+      if (newSession?.user) {
+        const uid = newSession.user.id
+        if (lastFetchedUserIdRef.current !== uid) {
+          const role = await fetchUserRole(uid)
+          if (mountedRef.current) setUserRole(role)
         }
+      } else {
+        // user signed out
+        lastFetchedUserIdRef.current = null
+        if (mountedRef.current) setUserRole(null)
       }
-    )
+    })
 
     return () => {
-      mounted = false
-      subscription?.unsubscribe()
+      mountedRef.current = false
+      sub?.subscription?.unsubscribe?.()
     }
   }, [])
 
-  const signUp = async (email: string, password: string, role: 'student' | 'instructor') => {
+  const signUp = async (email: string, password: string, role: "student" | "instructor") => {
     const { error, data } = await supabase.auth.signUp({
       email,
       password,
@@ -114,16 +132,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) throw error
 
     if (data.user) {
-      // Store user role in database
-      const { error: insertError } = await supabase.from('users').insert({
+      const { error: insertError } = await supabase.from("users").insert({
         id: data.user.id,
         email,
         role,
       })
 
       if (insertError) {
-        console.error('Error creating user record:', insertError)
-        throw new Error('Failed to create user profile. Please try again.')
+        console.error("Error creating user record:", insertError)
+        throw new Error("Failed to create user profile. Please try again.")
       }
     }
   }
@@ -133,7 +150,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       password,
     })
-
     if (error) throw error
   }
 
@@ -141,17 +157,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signOut()
       if (error) {
-        console.error('Supabase sign out error:', error)
-        // Continue anyway to clear local state
+        console.error("Supabase sign out error:", error)
       }
-      
-      // Clear local state
-      setUser(null)
-      setSession(null)
-      setUserRole(null)
-    } catch (error) {
-      console.error('Sign out exception:', error)
-      // Clear local state even if there's an error
+    } finally {
+      // clear local state regardless
+      lastFetchedUserIdRef.current = null
       setUser(null)
       setSession(null)
       setUserRole(null)
@@ -168,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider')
+    throw new Error("useAuth must be used within AuthProvider")
   }
   return context
 }
