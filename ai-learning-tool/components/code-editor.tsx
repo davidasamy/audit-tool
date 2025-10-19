@@ -5,6 +5,9 @@ type CodeEditorProps = {
   onChange: (code: string) => void
   pyodide?: any
   onOutput?: (output: string) => void
+  onRunTests?: () => void
+  isTestRunning?: boolean
+  pyodideReady?: boolean
 }
 
 declare global {
@@ -13,7 +16,7 @@ declare global {
   }
 }
 
-export function CodeEditor({ code, onChange, pyodide, onOutput }: CodeEditorProps) {
+export function CodeEditor({ code, onChange, pyodide, onOutput, onRunTests, isTestRunning, pyodideReady }: CodeEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const editorInstanceRef = useRef<any>(null)
   const [isRunning, setIsRunning] = useState(false)
@@ -151,16 +154,23 @@ _captured_output.getvalue()
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gray-100 border-b border-gray-300">
         <span className="text-sm text-gray-700 font-medium">solution.py</span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <span className="text-xs text-gray-500">
-            {!pyodide ? "Loading..." : isRunning ? "Running..." : "Ready"}
+            {!pyodideReady ? "Loading..." : (isRunning || isTestRunning) ? "Running..." : "Ready"}
           </span>
           <button
             onClick={executeCode}
-            disabled={!pyodide || isRunning}
+            disabled={!pyodideReady || isRunning || isTestRunning}
             className="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded transition-colors font-medium"
           >
             {isRunning ? "Running..." : "Run (Shift+Enter)"}
+          </button>
+          <button
+            onClick={onRunTests}
+            disabled={!pyodideReady || isRunning || isTestRunning}
+            className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded transition-colors font-medium"
+          >
+            {isTestRunning ? "Running Tests..." : "Run All Tests"}
           </button>
         </div>
       </div>

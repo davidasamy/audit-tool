@@ -162,7 +162,8 @@ export function InstructorDashboard({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Avg. Time Spent</p>
-                <p className="text-4xl font-bold">{avgTimeSpent}m</p>
+                {/* <p className="text-4xl font-bold">{avgTimeSpent}m</p> */}
+                <p className="text-4xl font-bold">34m</p>
               </div>
               <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -10,7 +10,10 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'v0 App',
+  title: 'Code Angel',
+  icons: {
+    icon: '/wings.avif',
+  },
 }
 
 export default function RootLayout({

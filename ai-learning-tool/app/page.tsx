@@ -39,14 +39,15 @@ export default function HomePage() {
   }
 
   return (
+    
     <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-gradient-to-br from-white via-blue-50 to-yellow-50">
       <div className="max-w-4xl w-full space-y-8 text-center">
         <div className="space-y-4">
           <h1 className="text-6xl font-bold text-balance">
-            Learn to Code with <span className="text-blue-600">AI</span>
+            Welcome to <span className="text-blue-600">Code Angel</span>
           </h1>
           <p className="text-xl text-gray-600 text-pretty max-w-2xl mx-auto">
-            A transparent learning platform where students solve problems with AI assistance, and instructors can
+            Your AI-powered coding companion. A transparent learning platform where students solve problems with AI assistance, and instructors can
             monitor progress and understand how AI is being used.
           </p>
         </div>

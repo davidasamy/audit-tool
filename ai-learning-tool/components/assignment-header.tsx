@@ -8,9 +8,9 @@ interface AssignmentHeaderProps {
 
 export function AssignmentHeader({ classId }: AssignmentHeaderProps) {
   return (
-    <header className="border-b border-gray-200 bg-white px-6 py-4">
+    <header className="border-b border-gray-200 bg-white px-6 py-2">
       <Link href={`/student/class/${classId}`}>
-        <Button variant="ghost" className="-ml-2">
+        <Button variant="ghost" size="sm" className="-ml-2">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Class
         </Button>

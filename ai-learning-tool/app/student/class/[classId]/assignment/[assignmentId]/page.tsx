@@ -58,10 +58,8 @@ export default function AssignmentPage({
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
-      <div className="flex-shrink-0">
-        <AssignmentHeader classId={classId} />
-      </div>
-      <div className="flex-1 min-h-0">
+      <AssignmentHeader classId={classId} />
+      <div className="flex-1 min-h-0 overflow-hidden">
         <StudentWorkspace problem={problem} assignmentId={assignmentId} classId={classId} />
       </div>
     </div>
