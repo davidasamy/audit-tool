@@ -38,13 +38,22 @@ async function extractTextFromPDF(buffer: Buffer): Promise<{
  */
 async function chunkText(text: string): Promise<string[]> {
   const splitter = new RecursiveCharacterTextSplitter({
-    chunkSize: 512,
-    chunkOverlap: 50,
+    chunkSize: 1200, // Increased from 512 to capture more context
+    chunkOverlap: 100, // Increased overlap for better continuity
     separators: ["\n\n", "\n", ". ", " ", ""],
   });
 
   const docs = await splitter.createDocuments([text]);
-  return docs.map((doc: { pageContent: string }) => doc.pageContent);
+  
+  // Filter out chunks that are too short (likely just headers or noise)
+  const minChunkLength = 100; // Minimum 100 characters
+  const filteredChunks = docs
+    .map((doc: { pageContent: string }) => doc.pageContent.trim())
+    .filter((chunk) => chunk.length >= minChunkLength);
+  
+  console.log(`Created ${docs.length} chunks, kept ${filteredChunks.length} after filtering (min length: ${minChunkLength})`);
+  
+  return filteredChunks;
 }
 
 /**

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { supabaseLogger } from "@/lib/supabase-logger"
 
+import { v4 as uuidv4 } from "uuid";
+
 type Problem = {
   id: string
   title: string
@@ -102,7 +104,7 @@ export function AIChatbot({
     if (!input.trim() || status === "streaming") return
 
     sendMessage({
-      id: crypto.randomUUID(),
+      id: uuidv4(),
       role: "user",
       parts: [{ type: "text", text: input }],
     })

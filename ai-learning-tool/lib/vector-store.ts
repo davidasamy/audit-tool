@@ -115,7 +115,8 @@ export async function createOrUpdateVectorStore(
 export async function queryVectorStore(
   assignmentId: string,
   query: string,
-  topK: number = 5
+  topK: number = 5,
+  similarityThreshold: number = 0.3
 ): Promise<string[]> {
   try {
     const { generateEmbedding } = await import("./bedrock");
@@ -134,10 +135,28 @@ export async function queryVectorStore(
         content: doc.content,
         similarity: cosineSimilarity(queryEmbedding, doc.embedding),
       }))
+      .filter((result) => result.similarity >= similarityThreshold) // Only include results above threshold
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, topK);
 
-    return results.map((result) => result.content);
+    // Deduplicate chunks based on content similarity
+    const deduplicatedResults: typeof results = [];
+    const seenContent = new Set<string>();
+    
+    for (const result of results) {
+      // Normalize content for comparison (trim and lowercase)
+      const normalizedContent = result.content.trim().toLowerCase();
+      
+      // Check if we've seen this exact content or very similar content
+      if (!seenContent.has(normalizedContent)) {
+        deduplicatedResults.push(result);
+        seenContent.add(normalizedContent);
+      }
+    }
+
+    console.log(`Retrieved ${results.length} chunks, ${deduplicatedResults.length} after deduplication`);
+    
+    return deduplicatedResults.map((result) => result.content);
   } catch (error) {
     console.warn(
       `Error querying vector store for assignment ${assignmentId}:`,

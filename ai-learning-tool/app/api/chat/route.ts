@@ -43,12 +43,24 @@ export async function POST(request: NextRequest) {
     const assignmentId = context.id;
     let contextChunks: string[] = [];
 
+    // Configuration for RAG retrieval
+    const MAX_CHUNKS = 7; // Configurable: how many chunks to retrieve (increased from 5)
+    const SIMILARITY_THRESHOLD = 0.3; // Configurable: minimum similarity score (0-1)
+
     // Check if vector store exists for this assignment
     if (await vectorStoreExists(assignmentId)) {
       try {
         // Retrieve relevant context from RAG
-        contextChunks = await queryVectorStore(assignmentId, userQuery, 5);
+        contextChunks = await queryVectorStore(assignmentId, userQuery, MAX_CHUNKS, SIMILARITY_THRESHOLD);
         console.log(`Found ${contextChunks.length} relevant context chunks for query: "${userQuery}"`);
+        console.log(`Embedding model: amazon.titan-embed-text-v1`);
+        console.log(`Config: MAX_CHUNKS=${MAX_CHUNKS}, SIMILARITY_THRESHOLD=${SIMILARITY_THRESHOLD}`);
+        console.log("\n=== RETRIEVED VECTOR CHUNKS ===");
+        contextChunks.forEach((chunk, index) => {
+          console.log(`\n--- Chunk ${index + 1} ---`);
+          console.log(chunk);
+        });
+        console.log("\n=== END OF CHUNKS ===\n");
       } catch (error) {
         console.error("Error querying vector store:", error);
         // Continue without RAG context if there's an error
